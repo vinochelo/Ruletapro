@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { NarratorStyle, TurnData } from '../types';
 import { playTick, playTone } from '../utils/audio';
 import { generateSketch, speakText } from '../services/geminiService';
-import { Timer, Wand2, XCircle, Play } from 'lucide-react';
+import { Timer, Wand2, XCircle, Play, Lightbulb } from 'lucide-react';
 
 interface GameCardProps {
   turnData: TurnData;
@@ -12,7 +12,7 @@ interface GameCardProps {
 
 const GameCard: React.FC<GameCardProps> = ({ turnData, narratorStyle, onClose }) => {
   const [timeLeft, setTimeLeft] = useState<number>(turnData.duration);
-  const [generatedImage, setGeneratedImage] = useState<string | null>(null);
+  const [generatedContent, setGeneratedContent] = useState<{type: 'image' | 'text', content: string} | null>(null);
   const [loadingImage, setLoadingImage] = useState(false);
   const [isActive, setIsActive] = useState(false); // Manual start
   
@@ -51,8 +51,8 @@ const GameCard: React.FC<GameCardProps> = ({ turnData, narratorStyle, onClose })
 
   const handleGenerateSketch = async () => {
     setLoadingImage(true);
-    const img = await generateSketch(turnData.word);
-    setGeneratedImage(img);
+    const result = await generateSketch(turnData.word);
+    setGeneratedContent(result);
     setLoadingImage(false);
   };
 
@@ -107,12 +107,22 @@ const GameCard: React.FC<GameCardProps> = ({ turnData, narratorStyle, onClose })
           </div>
 
           {/* AI Hint Section - Always Visible if Generated */}
-          {(generatedImage || !isFinished) && (
+          {(generatedContent || !isFinished) && (
             <div className="w-full flex justify-center py-2 shrink-0 pb-4">
-               {generatedImage ? (
-                  <div className="relative group w-full max-w-sm">
-                    <img src={generatedImage} alt="AI Hint" className="w-full h-auto max-h-[250px] object-contain rounded-lg border-2 border-slate-200 shadow-lg bg-white" />
-                    <span className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-xs text-slate-400 font-medium">Boceto generado por IA</span>
+               {generatedContent ? (
+                  <div className="relative group w-full max-w-sm flex flex-col items-center">
+                    {generatedContent.type === 'image' ? (
+                       <>
+                        <img src={generatedContent.content} alt="AI Hint" className="w-full h-auto max-h-[250px] object-contain rounded-lg border-2 border-slate-200 shadow-lg bg-white" />
+                        <span className="mt-2 text-xs text-slate-400 font-medium">Boceto generado por IA</span>
+                       </>
+                    ) : (
+                      <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-xl text-yellow-800 text-center shadow-sm">
+                        <div className="flex justify-center mb-2 text-yellow-500"><Lightbulb size={24} /></div>
+                        <p className="font-bold mb-1">Pista de texto (IA no pudo dibujar):</p>
+                        <p className="text-sm italic">{generatedContent.content}</p>
+                      </div>
+                    )}
                   </div>
                ) : (
                   !isFinished && (

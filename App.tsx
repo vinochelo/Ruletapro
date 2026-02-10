@@ -137,8 +137,9 @@ function App() {
     setTimeout(() => setPhase('PLAY'), 1000);
   };
 
-  const updateScore = async (participantId: string, delta: number) => {
-    const updatedParticipants = [...participants];
+  const updateScore = (participantId: string, delta: number) => {
+    // 1. Optimistic Update (Immediate UI response)
+    let updatedParticipants = [...participants];
     const playerIndex = participants.findIndex(p => p.id === participantId);
     if (playerIndex === -1) return;
 
@@ -148,25 +149,29 @@ function App() {
     updatedParticipants[playerIndex].score = newScore;
     setParticipants(updatedParticipants);
 
+    // 2. Logic Check
     if (delta > 0) {
       // Check for Game Winner
       if (newScore >= winningScore) {
         setPhase('WINNER');
-        const commentary = await generateCommentary(participants[playerIndex].name, newScore, true, narratorStyle);
-        setWinCommentary(commentary);
+        // Async call for commentary - does NOT block UI
+        generateCommentary(participants[playerIndex].name, newScore, true, narratorStyle)
+          .then(commentary => setWinCommentary(commentary));
         return;
       }
 
-      // Check for Leader Notification every 5 total points accumulated in the game
+      // Check for Leader Notification every 5 total points
       const totalPoints = updatedParticipants.reduce((sum, p) => sum + p.score, 0);
       
       if (totalPoints > 0 && totalPoints % 5 === 0) {
-        // Find current leader
         const leader = [...updatedParticipants].sort((a, b) => b.score - a.score)[0];
         
-        const commentary = await generateCommentary(leader.name, leader.score, false, narratorStyle);
-        setNotification(commentary);
-        setTimeout(() => setNotification(null), 8000);
+        // Async call for commentary
+        generateCommentary(leader.name, leader.score, false, narratorStyle)
+          .then(commentary => {
+             setNotification(commentary);
+             setTimeout(() => setNotification(null), 8000);
+          });
       }
     }
   };
@@ -180,6 +185,9 @@ function App() {
     setPhase('SETUP');
     // Reset scores but keep players for better UX with persistence
     setParticipants(participants.map(p => ({ ...p, score: 0 })));
+    // FIX: Clear previous game state so it doesn't show up in the new game
+    setWinCommentary(null);
+    setNotification(null);
   };
 
   // Render Setup
@@ -352,7 +360,8 @@ function App() {
           <div className="text-center p-8 max-w-2xl">
             <h1 className="text-7xl font-black text-yellow-500 mb-6 drop-shadow-sm animate-pulse">¡VICTORIA!</h1>
             <div className="text-5xl text-slate-800 font-bold mb-8">
-              ¡{participants.sort((a,b) => b.score - a.score)[0].name} es el campeón!
+              {/* FIX: Use a safe copy of participants to sort, avoiding in-place mutation of state during render */}
+              ¡{[...participants].sort((a,b) => b.score - a.score)[0]?.name} es el campeón!
             </div>
             <div className="bg-purple-100 p-8 rounded-3xl max-w-lg mx-auto mb-10 border-4 border-purple-200 shadow-xl">
               <p className="text-2xl italic text-purple-800 font-serif">"{winCommentary || '...'}"</p>
