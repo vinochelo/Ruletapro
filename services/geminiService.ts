@@ -3,13 +3,14 @@ import { Category, NarratorStyle } from "../types";
 
 // --- API KEY ROTATION LOGIC ---
 const getApiKeys = () => {
-  // The API key must be obtained exclusively from the environment variable process.env.API_KEY
-  const keys = process.env.API_KEY || '';
+  // En Vite (frontend), las variables se leen desde import.meta.env
+  // y deben empezar con VITE_ (como configuraste en Vercel: VITE_API_KEY)
+  const keys = import.meta.env.VITE_API_KEY || '';
   
   const keyList = keys.split(',').map((k: string) => k.trim()).filter((k: string) => k.length > 0);
   
   if (keyList.length === 0) {
-    console.error("❌ NO API KEYS FOUND. Please set process.env.API_KEY.");
+    console.error("❌ NO API KEYS FOUND. Ensure VITE_API_KEY is set in Vercel/Environment.");
   } else {
     console.log(`✅ Loaded ${keyList.length} API Key(s)`);
   }
