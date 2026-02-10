@@ -41,13 +41,13 @@ const getRandomFallback = (name: string, isWin: boolean) => {
 // --- PERSONA DEFINITIONS & VOICE MAPPING ---
 // Detailed prompts to ensure strong personality adherence
 const STYLE_PROMPTS: Record<NarratorStyle, string> = {
-  DOCUMENTARY: "Eres un narrador de documental de naturaleza legendario (estilo David Attenborough). Tu tono es solemne, majestuoso y profundamente serio. Analiza el puntaje como si fuera un evento crucial en la supervivencia de una especie. Usa oraciones completas y cultas. NO seas breve, sé descriptivo.",
-  SPORTS: "Eres un narrador de fútbol latinoamericano en una final del mundial. GRITA con pasión. Usa oraciones completas llenas de adrenalina. Describe la jugada con emoción desbordante. ¡Celebra cada punto como el gol del siglo!",
-  GRANNY: "Eres una abuelita extremadamente cariñosa. Habla con oraciones completas y dulces. Diles cuánto han crecido, ofréceles comida y diles que estás orgullosa de ellos. Usa diminutivos cariñosos en tus frases.",
-  SARCASTIC: "Eres un comediante amargado y cínico. Habla con oraciones completas llenas de ironía. Haz un comentario ácido sobre cómo seguramente fue suerte y no habilidad. Búrlate inteligentemente de la situación.",
-  ROBOT: "Eres una Inteligencia Artificial avanzada. Habla con oraciones completas y técnicas. Analiza la eficiencia de la victoria. Usa terminología de computación para describir el éxito humano.",
-  GEN_Z: "Eres un streamer de moda. Habla con oraciones completas usando mucho slang de internet. Di que la jugada fue 'God', 'de locos' o 'basada'. Muestra mucho hype en tu comentario.",
-  POET: "Eres un poeta dramático. Habla con oraciones completas, líricas y exageradas. Compara la victoria con el sol naciente o el amor eterno. Sé profundamente teatral."
+  DOCUMENTARY: "Eres un narrador de documental de naturaleza legendario (estilo David Attenborough). Tu tono es solemne, majestuoso y profundamente serio. Tómate tu tiempo para describir el puntaje como si fuera un evento crucial en la supervivencia de una especie. Elabora una narrativa breve de 2 o 3 frases sobre el comportamiento de este 'espécimen' humano. Usa vocabulario científico y culto.",
+  SPORTS: "Eres un narrador de fútbol latinoamericano en una final del mundial. GRITA con pasión desbordante. No te limites a una frase. Describe la jugada, la tensión en el estadio, la genialidad del jugador. Usa 2 o 3 oraciones llenas de adrenalina, metáforas exageradas y referencias futbolísticas. ¡Que se sienta la emoción!",
+  GRANNY: "Eres una abuelita extremadamente cariñosa y charlatana. No digas solo 'bien hecho'. Cuéntale una pequeña anécdota, ofrécele comida, dile cuánto ha crecido y lo orgullosa que estás. Habla con 2 o 3 frases llenas de amor, calidez y diminutivos (mijito, tesoro).",
+  SARCASTIC: "Eres un comediante amargado y cínico. No seas breve. Elabora tu burla. Explica por qué su éxito es seguramente un accidente cósmico o una señal del fin del mundo. Usa 2 o 3 frases de sarcasmo mordaz e inteligente. Nunca te muestres impresionado.",
+  ROBOT: "Eres una Inteligencia Artificial avanzada del año 3000. Proporciona un análisis detallado. No des solo el dato. Explica los cálculos, la probabilidad de éxito y la eficiencia energética de la jugada. Usa 2 o 3 oraciones complejas, técnicas y frías.",
+  GEN_Z: "Eres un streamer de moda con mucha energía. No digas solo 'GG'. Hypea el chat, pide clips, di que está rompiendo la matrix. Usa mucho slang (God, Nashe, de locos, en su prime, basado) y habla rápido. Tira 2 o 3 frases seguidas con mucho flow y energía caótica.",
+  POET: "Eres un poeta dramático del romanticismo. No puedes ser breve, tu alma es demasiado vasta. Declama una pequeña estrofa o prosa poética de 2 o 3 oraciones sobre la gloria, el destino y la belleza efímera de este punto. Sé intensamente emocional."
 };
 
 // Map styles to specific Gemini TTS voices that match the persona
@@ -213,62 +213,45 @@ export const generateMoreWords = async (catName: string, existing: string[]): Pr
 export const generateSketch = async (word: string): Promise<{type: 'image' | 'text', content: string} | null> => {
   if (imageQuotaExceeded) return null;
   
-  // STRATEGY: Prioritize Imagen 3.0 via generateImages. This is the correct way to generate images.
-  // Fallback to Flash Image only if that fails.
-  
+  // Using gemini-2.5-flash-image for reliable sketch generation via generateContent (General Task)
   try {
-    console.log(`Generating sketch for "${word}" with imagen-3.0-generate-001...`);
-    const response = await ai.models.generateImages({
-        model: 'imagen-3.0-generate-001',
-        prompt: `simple black and white continuous line drawing of a ${word}, minimalist pictionary style, white background, no text, no shading, clean lines`,
-        config: {
-            numberOfImages: 1,
-            aspectRatio: '1:1',
-            outputMimeType: 'image/jpeg'
-        }
+    console.log(`Generating sketch for "${word}" with gemini-2.5-flash-image...`);
+    
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash-image", 
+      contents: {
+        parts: [
+          { text: `Generate an image. A simple, high-contrast black and white line drawing of a ${word}. Minimalist pictionary style. White background. Do not include text.` }
+        ]
+      },
+      config: {
+        imageConfig: { aspectRatio: "1:1" },
+        safetySettings: [
+            { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+            { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
+            { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
+            { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+        ]
+      }
     });
 
-    const base64 = response.generatedImages?.[0]?.image?.imageBytes;
-    if (base64) {
-        return { type: 'image', content: `data:image/jpeg;base64,${base64}` };
+    for (const part of response.candidates?.[0]?.content?.parts || []) {
+      if (part.inlineData) {
+        const mime = part.inlineData.mimeType || 'image/png';
+        return { type: 'image', content: `data:${mime};base64,${part.inlineData.data}` };
+      }
     }
-    throw new Error("No image bytes returned from Imagen");
-
-  } catch (imagenError: any) {
-    console.warn("Imagen 3 generation failed, trying fallback to Flash...", imagenError);
-    if (imagenError.message?.includes('429')) rotateApiKey();
-
-    // Fallback: Gemini 2.5 Flash Image
-    try {
-        const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash-image", 
-            contents: {
-                parts: [
-                { text: `draw a simple black outline sketch of a ${word} on white background` }
-                ]
-            },
-            config: {
-                imageConfig: { aspectRatio: "1:1" },
-                safetySettings: [
-                    { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-                    { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
-                    { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
-                    { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-                ]
-            }
-        });
-
-        for (const part of response.candidates?.[0]?.content?.parts || []) {
-            if (part.inlineData) {
-                const mime = part.inlineData.mimeType || 'image/png';
-                return { type: 'image', content: `data:${mime};base64,${part.inlineData.data}` };
-            }
-        }
-    } catch (flashError) {
-        console.error("All image generation attempts failed", flashError);
-    }
-
+    
+    // Check if model returned text instead (refusal or confusion)
+    const textPart = response.candidates?.[0]?.content?.parts?.find(p => p.text)?.text;
+    if (textPart) console.warn("Model returned text instead of image:", textPart);
+    
     return { type: 'text', content: `No pude dibujar "${word}". ¡Usa tu imaginación!` };
+
+  } catch (error: any) {
+    console.warn("Sketch generation failed", error);
+    if (error.message?.includes('429')) rotateApiKey();
+    return { type: 'text', content: `Error de conexión. Intenta de nuevo.` };
   }
 };
 
@@ -285,23 +268,32 @@ export const generateCommentary = async (winnerName: string, score: number, isWi
       contents: [
         { 
           role: 'user', 
-          parts: [{ text: `SITUACIÓN: Juego de Pictionary. El jugador "${winnerName}" ${isWin ? `ha GANADO el juego` : `tiene ahora`} ${score} puntos.
-          TAREA: Escribe una oración completa, divertida y con mucha personalidad (aprox 20-30 palabras) reaccionando a esto. NO uses solo una palabra. Muestra tu personaje.` }] 
+          // Injecting persona into the user prompt ensures the model adheres to it more strictly than systemInstruction alone
+          parts: [{ text: `${persona}\n\nCONTEXTO: Estás narrando una partida de Pictionary.
+          EVENTO: El jugador "${winnerName}" ${isWin ? `ha GANADO la partida` : `acaba de ganar puntos y lleva`} ${score} puntos.
+          INSTRUCCIÓN: Genera un comentario de 2 a 3 oraciones completas y conectadas (aprox 40-60 palabras).
+          REQUISITO: Mantén tu personalidad al 100%. Sé específico, creativo y no repetitivo. Habla directamente sobre el jugador o la situación. NO des solo el nombre.` }] 
         }
       ],
       config: {
-        systemInstruction: { parts: [{ text: persona }] },
-        maxOutputTokens: 150, // Increased to allow full sentences
-        temperature: 0.9, // Slightly reduced to ensure coherence while maintaining creativity
+        maxOutputTokens: 250, 
+        temperature: 0.85, 
         topP: 0.95,
       }
     });
 
-    const text = response.text?.trim();
+    let text = response.text?.trim();
     if (!text) throw new Error("Empty response");
     
-    // Clean up quotes if the model adds them
-    return text.replace(/^["']|["']$/g, '');
+    text = text.replace(/^["']|["']$/g, '');
+
+    // Validation: If text is too short (likely just a name or one word), use fallback
+    if (text.split(' ').length < 5) {
+        console.warn("Commentary too short, using fallback", text);
+        return fallback; 
+    }
+
+    return text;
   } catch (e) {
     console.error("Commentary Error", e);
     return fallback;
