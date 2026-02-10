@@ -4,8 +4,9 @@ import { Category, NarratorStyle } from "../types";
 // --- API KEY ROTATION LOGIC ---
 const getApiKeys = () => {
   // En Vite (frontend), las variables se leen desde import.meta.env
-  // y deben empezar con VITE_ (como configuraste en Vercel: VITE_API_KEY)
-  const keys = import.meta.env.VITE_API_KEY || '';
+  // Usamos (import.meta as any) para evitar errores de TypeScript durante el build en Vercel
+  const meta = import.meta as any;
+  const keys = meta.env?.VITE_API_KEY || '';
   
   const keyList = keys.split(',').map((k: string) => k.trim()).filter((k: string) => k.length > 0);
   
