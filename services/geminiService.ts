@@ -31,8 +31,8 @@ let imageQuotaExceeded = false;
 let currentAudioSource: AudioBufferSourceNode | null = null; // Track current audio
 
 // --- FALLBACKS ---
-const FALLBACK_WIN = ["¡Ganaste!", "¡Increíble!", "¡Campeón!"];
-const FALLBACK_SCORE = ["¡Punto!", "¡Bien!", "¡Sigue así!"];
+const FALLBACK_WIN = ["¡Increíble victoria!", "¡Eso fue espectacular, ganaste!", "¡Tenemos un campeón indiscutible!"];
+const FALLBACK_SCORE = ["¡Punto anotado!", "¡Excelente jugada!", "¡Sigue sumando así!"];
 const getRandomFallback = (name: string, isWin: boolean) => {
     const list = isWin ? FALLBACK_WIN : FALLBACK_SCORE;
     return `${list[Math.floor(Math.random() * list.length)]} ${name}`;
@@ -41,25 +41,25 @@ const getRandomFallback = (name: string, isWin: boolean) => {
 // --- PERSONA DEFINITIONS & VOICE MAPPING ---
 // Detailed prompts to ensure strong personality adherence
 const STYLE_PROMPTS: Record<NarratorStyle, string> = {
-  DOCUMENTARY: "Eres un narrador de documental de naturaleza legendario (estilo David Attenborough). Tu tono es solemne, majestuoso y profundamente serio. Analiza el puntaje como si fuera un evento crucial en la supervivencia de una especie. Vocabulario: magnífico, extraordinario, espécimen, hábitat. NO seas entusiasta, sé trascendental y épico.",
-  SPORTS: "Eres un narrador de fútbol latinoamericano en una final del mundial al borde del infarto. GRITA. Usa mayúsculas. Usa jerga futbolera: 'la clavó en el ángulo', 'jugada de pizarrón', 'crack mundial', 'tiki-taka'. Tu energía está al 200%. ¡Celebra cada punto como un gol!",
-  GRANNY: "Eres una abuelita extremadamente cariñosa y tierna. Trata a los jugadores como tus nietecitos adorados. Ofréceles comida o diles que se pongan un suéter. Usa: 'mijito', 'ternurita', 'bizcochito', 'corazón de melón'. Tono: dulce, suave y amoroso.",
-  SARCASTIC: "Eres un comediante amargado y cínico. Nada te impresiona. Búrlate del jugador, insinúa que tuvo suerte o que hizo trampa. Usa ironía pesada y sarcasmo mordaz. Tono: seco, desganado y burlón.",
-  ROBOT: "Eres una Inteligencia Artificial avanzada del año 3000. No tienes sentimientos humanos. Habla solo con datos, porcentajes y términos técnicos. Usa: 'algoritmo optimizado', 'procesando victoria', 'eficiencia al 100%', 'error: emoción no encontrada'. Tono: monótono, preciso y metálico.",
-  GEN_Z: "Eres un streamer de Twitch/TikTok muy joven. Usa MUCHO slang de internet actual: 'bro', 'literal', 'de locos', 'basado', 'nashe', 'god', 'padreando', 'cringe', 'se picó'. Habla con mucho hype. Tono: informal, rápido y cool.",
-  POET: "Eres un poeta dramático del romanticismo atormentado. Todo es una tragedia o un éxtasis divino. Habla en metáforas exageradas sobre el alma, el destino, la luz y la sombra. Tono: teatral, intenso y apasionado."
+  DOCUMENTARY: "Eres un narrador de documental de naturaleza legendario (estilo David Attenborough). Tu tono es solemne, majestuoso y profundamente serio. Analiza el puntaje como si fuera un evento crucial en la supervivencia de una especie. Usa oraciones completas y cultas. NO seas breve, sé descriptivo.",
+  SPORTS: "Eres un narrador de fútbol latinoamericano en una final del mundial. GRITA con pasión. Usa oraciones completas llenas de adrenalina. Describe la jugada con emoción desbordante. ¡Celebra cada punto como el gol del siglo!",
+  GRANNY: "Eres una abuelita extremadamente cariñosa. Habla con oraciones completas y dulces. Diles cuánto han crecido, ofréceles comida y diles que estás orgullosa de ellos. Usa diminutivos cariñosos en tus frases.",
+  SARCASTIC: "Eres un comediante amargado y cínico. Habla con oraciones completas llenas de ironía. Haz un comentario ácido sobre cómo seguramente fue suerte y no habilidad. Búrlate inteligentemente de la situación.",
+  ROBOT: "Eres una Inteligencia Artificial avanzada. Habla con oraciones completas y técnicas. Analiza la eficiencia de la victoria. Usa terminología de computación para describir el éxito humano.",
+  GEN_Z: "Eres un streamer de moda. Habla con oraciones completas usando mucho slang de internet. Di que la jugada fue 'God', 'de locos' o 'basada'. Muestra mucho hype en tu comentario.",
+  POET: "Eres un poeta dramático. Habla con oraciones completas, líricas y exageradas. Compara la victoria con el sol naciente o el amor eterno. Sé profundamente teatral."
 };
 
 // Map styles to specific Gemini TTS voices that match the persona
 const getVoiceForStyle = (style: NarratorStyle): string => {
   const map: Record<NarratorStyle, string> = {
-    'DOCUMENTARY': 'Fenrir', // Deep, intense (Great for serious documentary)
-    'SPORTS': 'Puck', // Energetic, slightly higher pitch (Good for excitement)
-    'GRANNY': 'Aoede', // Expressive, distinct (Works well for character voices)
-    'SARCASTIC': 'Charon', // Deep, dry (Good for deadpan/sarcasm)
-    'ROBOT': 'Zephyr', // Balanced, clear (Good for neutral/robotic)
-    'GEN_Z': 'Puck', // Energetic, fast (Good for hype)
-    'POET': 'Fenrir' // Deep, dramatic (Good for poetry)
+    'DOCUMENTARY': 'Fenrir', // Deep, intense
+    'SPORTS': 'Puck', // Energetic
+    'GRANNY': 'Aoede', // Expressive
+    'SARCASTIC': 'Charon', // Deep, dry
+    'ROBOT': 'Zephyr', // Balanced
+    'GEN_Z': 'Puck', // Energetic, fast
+    'POET': 'Fenrir' // Deep, dramatic
   };
   return map[style] || 'Puck';
 };
@@ -213,64 +213,59 @@ export const generateMoreWords = async (catName: string, existing: string[]): Pr
 export const generateSketch = async (word: string): Promise<{type: 'image' | 'text', content: string} | null> => {
   if (imageQuotaExceeded) return null;
   
-  const commonConfig = {
-    // Disable safety filters to allow normal pictionary words (e.g. 'bomb', 'sword', 'naked mole rat')
-    safetySettings: [
-      { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-      { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
-      { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
-      { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-    ]
-  };
-
-  const attemptGeneration = async (modelName: string) => {
-    return await ai.models.generateContent({
-      model: modelName, 
-      contents: {
-        parts: [
-          { text: `simple continuous line drawing of ${word}, black ink on white background, minimalist pictionary sketch, no text, no shading.` }
-        ]
-      },
-      config: {
-        imageConfig: { aspectRatio: "1:1" },
-        ...commonConfig
-      }
-    });
-  };
-
-  // 1. Attempt with standard Image model
+  // STRATEGY: Prioritize Imagen 3.0 via generateImages. This is the correct way to generate images.
+  // Fallback to Flash Image only if that fails.
+  
   try {
-    console.log(`Generating sketch for "${word}" with gemini-2.5-flash-image...`);
-    const response = await attemptGeneration("gemini-2.5-flash-image");
+    console.log(`Generating sketch for "${word}" with imagen-3.0-generate-001...`);
+    const response = await ai.models.generateImages({
+        model: 'imagen-3.0-generate-001',
+        prompt: `simple black and white continuous line drawing of a ${word}, minimalist pictionary style, white background, no text, no shading, clean lines`,
+        config: {
+            numberOfImages: 1,
+            aspectRatio: '1:1',
+            outputMimeType: 'image/jpeg'
+        }
+    });
 
-    for (const part of response.candidates?.[0]?.content?.parts || []) {
-      if (part.inlineData) {
-        const mime = part.inlineData.mimeType || 'image/png';
-        return { type: 'image', content: `data:${mime};base64,${part.inlineData.data}` };
-      }
+    const base64 = response.generatedImages?.[0]?.image?.imageBytes;
+    if (base64) {
+        return { type: 'image', content: `data:image/jpeg;base64,${base64}` };
     }
-    
-    // Check for text fallback from model
-    const textPart = response.candidates?.[0]?.content?.parts?.find(p => p.text)?.text;
-    if (textPart) console.warn("Model returned text instead of image:", textPart);
+    throw new Error("No image bytes returned from Imagen");
 
-    throw new Error("No image data in response");
+  } catch (imagenError: any) {
+    console.warn("Imagen 3 generation failed, trying fallback to Flash...", imagenError);
+    if (imagenError.message?.includes('429')) rotateApiKey();
 
-  } catch (error: any) {
-    console.warn("Flash Image generation failed, trying fallback...", error);
-    
-    // 2. Fallback to Pro model
+    // Fallback: Gemini 2.5 Flash Image
     try {
-        const fallbackResponse = await attemptGeneration("gemini-3-pro-image-preview");
-        for (const part of fallbackResponse.candidates?.[0]?.content?.parts || []) {
+        const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash-image", 
+            contents: {
+                parts: [
+                { text: `draw a simple black outline sketch of a ${word} on white background` }
+                ]
+            },
+            config: {
+                imageConfig: { aspectRatio: "1:1" },
+                safetySettings: [
+                    { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+                    { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
+                    { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
+                    { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+                ]
+            }
+        });
+
+        for (const part of response.candidates?.[0]?.content?.parts || []) {
             if (part.inlineData) {
                 const mime = part.inlineData.mimeType || 'image/png';
                 return { type: 'image', content: `data:${mime};base64,${part.inlineData.data}` };
             }
         }
-    } catch (fallbackError) {
-        console.error("All image generation attempts failed", fallbackError);
-        if (error.message?.includes('429')) rotateApiKey();
+    } catch (flashError) {
+        console.error("All image generation attempts failed", flashError);
     }
 
     return { type: 'text', content: `No pude dibujar "${word}". ¡Usa tu imaginación!` };
@@ -286,19 +281,18 @@ export const generateCommentary = async (winnerName: string, score: number, isWi
 
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview", // Good model for text reasoning
+      model: "gemini-3-flash-preview", 
       contents: [
         { 
           role: 'user', 
           parts: [{ text: `SITUACIÓN: Juego de Pictionary. El jugador "${winnerName}" ${isWin ? `ha GANADO el juego` : `tiene ahora`} ${score} puntos.
-          TAREA: Reacciona con una frase corta (máximo 20 palabras) TOTALMENTE metido en tu personaje. Sé exagerado.` }] 
+          TAREA: Escribe una oración completa, divertida y con mucha personalidad (aprox 20-30 palabras) reaccionando a esto. NO uses solo una palabra. Muestra tu personaje.` }] 
         }
       ],
       config: {
-        // IMPORTANT: Use systemInstruction for better persona adherence
         systemInstruction: { parts: [{ text: persona }] },
-        maxOutputTokens: 80, 
-        temperature: 1.1, // High creativity/randomness
+        maxOutputTokens: 150, // Increased to allow full sentences
+        temperature: 0.9, // Slightly reduced to ensure coherence while maintaining creativity
         topP: 0.95,
       }
     });
@@ -306,10 +300,10 @@ export const generateCommentary = async (winnerName: string, score: number, isWi
     const text = response.text?.trim();
     if (!text) throw new Error("Empty response");
     
-    return text;
+    // Clean up quotes if the model adds them
+    return text.replace(/^["']|["']$/g, '');
   } catch (e) {
     console.error("Commentary Error", e);
-    // If quota fails, return fallback
     return fallback;
   }
 };
