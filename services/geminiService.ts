@@ -38,6 +38,17 @@ const getRandomFallback = (name: string, isWin: boolean) => {
     return `${list[Math.floor(Math.random() * list.length)]} ${name}`;
 };
 
+// --- PERSONA DEFINITIONS ---
+const STYLE_PROMPTS: Record<NarratorStyle, string> = {
+  DOCUMENTARY: "Eres un narrador de documental de naturaleza serio y profundo (estilo Morgan Freeman). Describe el puntaje como un evento majestuoso y solemne de la fauna salvaje. Usa vocabulario culto.",
+  SPORTS: "Eres un comentarista de fútbol latino eufórico. ¡Grita, usa mucha adrenalina! Usa frases como '¡GOLAZO!', '¡JUGADA MAESTRA!', '¡QUÉ CLASE!'.",
+  GRANNY: "Eres una abuelita dulce y consentidora. Usa diminutivos (mi niño, tesoro, corazoncito), habla de darles comida o un suéter. Muy tierna y orgullosa.",
+  SARCASTIC: "Eres un comediante cínico y sarcástico. Haz un comentario ácido, burla ligera sobre el esfuerzo o di 'no es para tanto'. Tono de burla inteligente y seco.",
+  ROBOT: "Eres una IA analítica. Usa términos como 'cálculo completado', 'eficiencia incrementada', 'algoritmo de victoria', 'procesando datos'. Sin emociones, voz metálica.",
+  GEN_Z: "Eres un streamer joven de la Gen Z. Usa slang actual obligatorio: 'de locos', 'god', 'nashe', 'literal', 'basado', 'cringe', 'bro', 'de una'. Tono hypeado.",
+  POET: "Eres un poeta dramático y exagerado del siglo XIX. Habla con rimas, metáforas floridas y sufrimiento o éxtasis extremo. Muy teatral."
+};
+
 // --- AUDIO HELPERS ---
 const decodePCMAudioData = (base64String: string, audioContext: AudioContext, sampleRate: number = 24000) => {
   const binaryString = atob(base64String);
@@ -57,8 +68,13 @@ const decodePCMAudioData = (base64String: string, audioContext: AudioContext, sa
 
 const getVoiceForStyle = (style: NarratorStyle): string => {
   const map: Record<NarratorStyle, string> = {
-    'DOCUMENTARY': 'Orus', 'SPORTS': 'Puck', 'GRANNY': 'Kore',
-    'SARCASTIC': 'Charon', 'ROBOT': 'Zephyr', 'GEN_Z': 'Puck', 'POET': 'Kore'
+    'DOCUMENTARY': 'Orus', // Deep male
+    'SPORTS': 'Puck', // Energetic
+    'GRANNY': 'Kore', // Soft/Calm (closest match)
+    'SARCASTIC': 'Charon', // Deep/Dry
+    'ROBOT': 'Zephyr', // Balanced/Clear
+    'GEN_Z': 'Puck', // Energetic/Fast
+    'POET': 'Kore' // Poetic/Soft
   };
   return map[style] || 'Puck';
 };
@@ -262,21 +278,26 @@ export const generateCommentary = async (winnerName: string, score: number, isWi
   const fallback = getRandomFallback(winnerName, isWin);
   if (textQuotaExceeded) return fallback;
 
+  const personaInstruction = STYLE_PROMPTS[style] || "Comentarista divertido.";
+
   try {
     const prompt = `
-      Rol: Comentarista estilo ${style}.
-      Contexto: Pictionary. Jugador "${winnerName}" ${isWin ? `GANÓ con ${score} pts` : `tiene ${score} pts`}.
-      Tarea: Frase CORTA y graciosa (max 10 palabras).
+      ACTÚA COMO: ${personaInstruction}
+      SITUACIÓN: Juego de Pictionary. El jugador "${winnerName}" ${isWin ? `ha GANADO la partida finalmente con` : `acaba de ganar puntos y ahora tiene`} ${score} puntos.
+      TAREA: Di una frase CORTA (máximo 15 palabras) reaccionando a esto. MANTÉN TU PERSONAJE.
+      IDIOMA: Español.
     `;
 
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: prompt,
       config: {
-        maxOutputTokens: 30, // Limit output for speed
+        maxOutputTokens: 50, // Keep it short
+        temperature: 1, // High creativity for personality
+        topP: 0.95,
       }
     });
 
-    return response.text || fallback;
+    return response.text?.trim() || fallback;
   } catch (e) { return fallback; }
 };
