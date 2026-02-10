@@ -381,19 +381,22 @@ function App() {
 
       {/* Winner Mode */}
       {phase === 'WINNER' && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-white/95 backdrop-blur-md">
-          <div className="text-center p-8 max-w-2xl">
-            <h1 className="text-7xl font-black text-yellow-500 mb-6 drop-shadow-sm animate-pulse">¡VICTORIA!</h1>
-            <div className="text-5xl text-slate-800 font-bold mb-8">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-white/95 backdrop-blur-md overflow-hidden">
+          <div className="text-center p-8 max-w-2xl w-full flex flex-col max-h-screen">
+            <h1 className="text-5xl md:text-7xl font-black text-yellow-500 mb-6 drop-shadow-sm animate-pulse shrink-0">¡VICTORIA!</h1>
+            <div className="text-3xl md:text-5xl text-slate-800 font-bold mb-8 shrink-0">
               {/* FIX: Use a safe copy of participants to sort, avoiding in-place mutation of state during render */}
               ¡{[...participants].sort((a,b) => b.score - a.score)[0]?.name} es el campeón!
             </div>
-            <div className="bg-purple-100 p-8 rounded-3xl max-w-lg mx-auto mb-10 border-4 border-purple-200 shadow-xl">
-              <p className="text-2xl italic text-purple-800 font-serif">"{winCommentary || '...'}"</p>
+            
+            {/* Scrollable text container to prevent clipping on small screens or with long text */}
+            <div className="bg-purple-100 p-6 md:p-8 rounded-3xl max-w-lg mx-auto mb-10 border-4 border-purple-200 shadow-xl overflow-y-auto max-h-[40vh] custom-scrollbar">
+              <p className="text-xl md:text-2xl italic text-purple-800 font-serif leading-relaxed">"{winCommentary || '...'}"</p>
             </div>
+            
             <button 
               onClick={resetGame}
-              className="px-10 py-4 bg-slate-900 text-white font-bold rounded-full hover:scale-110 transition-transform flex items-center gap-3 mx-auto shadow-2xl text-xl"
+              className="px-10 py-4 bg-slate-900 text-white font-bold rounded-full hover:scale-110 transition-transform flex items-center gap-3 mx-auto shadow-2xl text-xl shrink-0"
             >
               <RotateCcw size={24} /> Jugar de Nuevo
             </button>

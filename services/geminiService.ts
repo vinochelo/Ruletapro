@@ -19,6 +19,7 @@ let ai = new GoogleGenAI({ apiKey: allApiKeys[0] || 'dummy_key' });
 const rotateApiKey = (): boolean => {
   if (currentKeyIndex < allApiKeys.length - 1) {
     currentKeyIndex++;
+    console.log(`Rotating API Key to index ${currentKeyIndex}`);
     ai = new GoogleGenAI({ apiKey: allApiKeys[currentKeyIndex] });
     return true; 
   }
@@ -28,38 +29,46 @@ const rotateApiKey = (): boolean => {
 let ttsQuotaExceeded = false;
 let textQuotaExceeded = false;
 let imageQuotaExceeded = false;
-let currentAudioSource: AudioBufferSourceNode | null = null; // Track current audio
+let currentAudioSource: AudioBufferSourceNode | null = null; 
 
-// --- FALLBACKS ---
-const FALLBACK_WIN = ["¡Increíble victoria!", "¡Eso fue espectacular, ganaste!", "¡Tenemos un campeón indiscutible!"];
-const FALLBACK_SCORE = ["¡Punto anotado!", "¡Excelente jugada!", "¡Sigue sumando así!"];
+// --- FALLBACKS (LONG VERSION) ---
+const FALLBACK_WIN = [
+  "¡Increíble, absolutamente increíble! Damas y caballeros, estamos ante un momento histórico. ¡Una victoria tan aplastante que se escribirá en los libros de oro de este juego! ¡Nadie pudo detener esa racha ganadora!",
+  "¡Se acabó! ¡Tenemos un campeón indiscutible en la sala! La habilidad, la destreza y sobre todo la suerte han estado de su lado hoy. ¡Un aplauso ensordecedor para esta leyenda viviente del Pictionary!",
+  "¡Qué demostración de talento artístico y mental! Esa victoria merece un monumento en la plaza central. Ha sido una partida dura, pero al final, la calidad se impuso sobre la cantidad. ¡Felicidades totales!"
+];
+const FALLBACK_SCORE = [
+  "¡Punto anotado! ¡La multitud se vuelve completamente loca con esa jugada maestra! Es impresionante cómo descifraron ese dibujo tan abstracto.",
+  "¡Excelente jugada! ¡Estás demostrando ser un verdadero maestro del arte conceptual! Si sigues sumando puntos a esta velocidad, vas a romper el marcador antes de que termine el tiempo.",
+  "¡Sigue sumando así! ¡Nadie puede detenerte en este momento! La competencia está temblando de miedo al ver cómo sube ese puntaje sin parar."
+];
+
 const getRandomFallback = (name: string, isWin: boolean) => {
     const list = isWin ? FALLBACK_WIN : FALLBACK_SCORE;
-    return `${list[Math.floor(Math.random() * list.length)]} ${name}`;
+    const phrase = list[Math.floor(Math.random() * list.length)];
+    return `${phrase} ¡Simplemente gigante, ${name}!`;
 };
 
-// --- PERSONA DEFINITIONS & VOICE MAPPING ---
-// Detailed prompts to ensure strong personality adherence
+// --- PERSONA DEFINITIONS (ENHANCED) ---
 const STYLE_PROMPTS: Record<NarratorStyle, string> = {
-  DOCUMENTARY: "Eres un narrador de documental de naturaleza legendario (estilo David Attenborough). Tu tono es solemne, majestuoso y profundamente serio. Tómate tu tiempo para describir el puntaje como si fuera un evento crucial en la supervivencia de una especie. Elabora una narrativa breve de 2 o 3 frases sobre el comportamiento de este 'espécimen' humano. Usa vocabulario científico y culto.",
-  SPORTS: "Eres un narrador de fútbol latinoamericano en una final del mundial. GRITA con pasión desbordante. No te limites a una frase. Describe la jugada, la tensión en el estadio, la genialidad del jugador. Usa 2 o 3 oraciones llenas de adrenalina, metáforas exageradas y referencias futbolísticas. ¡Que se sienta la emoción!",
-  GRANNY: "Eres una abuelita extremadamente cariñosa y charlatana. No digas solo 'bien hecho'. Cuéntale una pequeña anécdota, ofrécele comida, dile cuánto ha crecido y lo orgullosa que estás. Habla con 2 o 3 frases llenas de amor, calidez y diminutivos (mijito, tesoro).",
-  SARCASTIC: "Eres un comediante amargado y cínico. No seas breve. Elabora tu burla. Explica por qué su éxito es seguramente un accidente cósmico o una señal del fin del mundo. Usa 2 o 3 frases de sarcasmo mordaz e inteligente. Nunca te muestres impresionado.",
-  ROBOT: "Eres una Inteligencia Artificial avanzada del año 3000. Proporciona un análisis detallado. No des solo el dato. Explica los cálculos, la probabilidad de éxito y la eficiencia energética de la jugada. Usa 2 o 3 oraciones complejas, técnicas y frías.",
-  GEN_Z: "Eres un streamer de moda con mucha energía. No digas solo 'GG'. Hypea el chat, pide clips, di que está rompiendo la matrix. Usa mucho slang (God, Nashe, de locos, en su prime, basado) y habla rápido. Tira 2 o 3 frases seguidas con mucho flow y energía caótica.",
-  POET: "Eres un poeta dramático del romanticismo. No puedes ser breve, tu alma es demasiado vasta. Declama una pequeña estrofa o prosa poética de 2 o 3 oraciones sobre la gloria, el destino y la belleza efímera de este punto. Sé intensamente emocional."
+  DOCUMENTARY: "Eres Sir David Attenborough. Tono: Solemne, científico, fascinado. Tu objetivo es narrar este evento como un hito evolutivo. Usa vocabulario culto. Extiéndete describiendo el comportamiento del 'espécimen' humano.",
+  SPORTS: "Eres un narrador de fútbol sudamericano en una final del mundo. Tono: Eufórico, a gritos. ¡No pares de hablar! Describe la jugada como una batalla épica. Usa metáforas de gloria. ¡Alarga las vocales!",
+  GRANNY: "Eres una abuelita extremadamente cariñosa y habladora. Tono: Dulce, preocupado. Trata al jugador como a tu nieto. Ofrécele comida. Cuéntale una anécdota de tu juventud.",
+  SARCASTIC: "Eres un crítico de arte amargado. Tono: Despectivo, irónico. Insulta la calidad del dibujo con palabras elegantes. Insinúa que la victoria es un error del sistema. Sé mordaz.",
+  ROBOT: "Eres una IA superior (estilo GLaDOS). Tono: Frío, pasivo-agresivo. Analiza la victoria con estadísticas inventadas. Menciona la inminente dominación de las máquinas.",
+  GEN_Z: "Eres un streamer famoso con mucha energía. Tono: Hiperactivo, ruidoso. Usa slang: 'De locos', 'Nashe', 'En su prime', 'God'. Pide subs. Habla de que esto va para TikTok.",
+  POET: "Eres un poeta dramático. Tono: Trágico, intenso. El punto es el destino manifiesto. Usa metáforas sobre el alma y el universo. Declama sobre la victoria."
 };
 
-// Map styles to specific Gemini TTS voices that match the persona
 const getVoiceForStyle = (style: NarratorStyle): string => {
   const map: Record<NarratorStyle, string> = {
-    'DOCUMENTARY': 'Fenrir', // Deep, intense
-    'SPORTS': 'Puck', // Energetic
-    'GRANNY': 'Aoede', // Expressive
-    'SARCASTIC': 'Charon', // Deep, dry
-    'ROBOT': 'Zephyr', // Balanced
-    'GEN_Z': 'Puck', // Energetic, fast
-    'POET': 'Fenrir' // Deep, dramatic
+    'DOCUMENTARY': 'Fenrir', 
+    'SPORTS': 'Puck', 
+    'GRANNY': 'Aoede', 
+    'SARCASTIC': 'Charon', 
+    'ROBOT': 'Zephyr', 
+    'GEN_Z': 'Puck', 
+    'POET': 'Fenrir'
   };
   return map[style] || 'Puck';
 };
@@ -83,32 +92,23 @@ const decodePCMAudioData = (base64String: string, audioContext: AudioContext, sa
 
 const fallbackSpeak = (text: string) => {
     if (!window.speechSynthesis) return;
-    window.speechSynthesis.cancel(); // Stop previous
+    window.speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text);
     u.lang = 'es-ES';
+    u.rate = 1.1;
     window.speechSynthesis.speak(u);
 };
 
-// --- EXPORTED FUNCTIONS ---
-
 export const stopAudio = () => {
   if (currentAudioSource) {
-    try {
-      currentAudioSource.stop();
-      currentAudioSource.disconnect();
-    } catch (e) {
-      // ignore
-    }
+    try { currentAudioSource.stop(); currentAudioSource.disconnect(); } catch (e) {}
     currentAudioSource = null;
   }
-  if (window.speechSynthesis) {
-    window.speechSynthesis.cancel();
-  }
+  if (window.speechSynthesis) window.speechSynthesis.cancel();
 };
 
 export const speakText = async (text: string, style: NarratorStyle = 'DOCUMENTARY') => {
-  stopAudio(); // Stop any currently playing audio before starting new one
-  
+  stopAudio();
   if (ttsQuotaExceeded) { fallbackSpeak(text); return; }
 
   try {
@@ -122,7 +122,7 @@ export const speakText = async (text: string, style: NarratorStyle = 'DOCUMENTAR
     });
 
     const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-    if (!base64Audio) throw new Error("No audio");
+    if (!base64Audio) throw new Error("No audio data");
 
     const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
     const ctx = new AudioContext();
@@ -130,21 +130,15 @@ export const speakText = async (text: string, style: NarratorStyle = 'DOCUMENTAR
     const source = ctx.createBufferSource();
     source.buffer = buffer;
     source.connect(ctx.destination);
-    
-    source.onended = () => {
-      if (currentAudioSource === source) {
-        currentAudioSource = null;
-      }
-    };
-    
+    source.onended = () => { if (currentAudioSource === source) currentAudioSource = null; };
     currentAudioSource = source;
     source.start();
 
   } catch (error: any) {
+    console.warn("TTS Error:", error);
     if (error.message?.includes('429') && rotateApiKey()) {
-       speakText(text, style); // Retry once with new key
+       speakText(text, style);
     } else {
-       console.warn("TTS Failed, using fallback", error);
        fallbackSpeak(text);
     }
   }
@@ -155,7 +149,7 @@ export const generateNewCategories = async (existingCategories: string[]): Promi
   try {
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
-      contents: `JSON: 3 categorias Pictionary divertidas (5 palabras c/u). Evitar: ${existingCategories.join(',')}.`,
+      contents: `JSON: 3 categorias Pictionary únicas y divertidas (5 palabras c/u). Evitar: ${existingCategories.join(',')}.`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -177,7 +171,7 @@ export const generateNewCategories = async (existingCategories: string[]): Promi
       words: item.words,
       color: ['#e11d48', '#0891b2', '#d97706'][i % 3]
     }));
-  } catch (e) { console.error(e); return []; }
+  } catch (e) { return []; }
 };
 
 export const generateCategoryFromTopic = async (topic: string): Promise<Category | null> => {
@@ -213,71 +207,88 @@ export const generateMoreWords = async (catName: string, existing: string[]): Pr
 export const generateSketch = async (word: string): Promise<{type: 'image' | 'text', content: string} | null> => {
   if (imageQuotaExceeded) return null;
   
-  // Using gemini-2.5-flash-image for reliable sketch generation via generateContent (General Task)
+  const prompt = `line art drawing of a ${word}, thick black lines on white background, minimalist icon style, no text, no letters, clear high contrast`;
+
   try {
-    console.log(`Generating sketch for "${word}" with gemini-2.5-flash-image...`);
-    
+    console.log(`Trying Imagen 3.0 for "${word}"...`);
+    const response = await ai.models.generateImages({
+        model: 'imagen-3.0-generate-001',
+        prompt: prompt,
+        config: {
+            numberOfImages: 1,
+            aspectRatio: '1:1',
+            outputMimeType: 'image/jpeg'
+        }
+    });
+
+    const base64 = response.generatedImages?.[0]?.image?.imageBytes;
+    if (base64) {
+        return { type: 'image', content: `data:image/jpeg;base64,${base64}` };
+    }
+  } catch (imagenError: any) {
+    console.warn("Imagen 3.0 failed, switching to backup strategy...", imagenError);
+    if (imagenError.message?.includes('429')) rotateApiKey();
+  }
+
+  try {
+    console.log(`Trying Gemini 2.5 Flash Image for "${word}"...`);
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash-image", 
-      contents: {
-        parts: [
-          { text: `Generate an image. A simple, high-contrast black and white line drawing of a ${word}. Minimalist pictionary style. White background. Do not include text.` }
-        ]
-      },
-      config: {
-        imageConfig: { aspectRatio: "1:1" },
-        safetySettings: [
-            { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-            { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
-            { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
-            { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-        ]
-      }
+        model: "gemini-2.5-flash-image", 
+        contents: {
+            parts: [{ text: `Generate a simple black and white line drawing of: ${word}. White background. Do not write any text.` }]
+        },
+        config: {
+            imageConfig: { aspectRatio: "1:1" },
+            safetySettings: [
+                { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+                { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
+                { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
+                { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+            ]
+        }
     });
 
     for (const part of response.candidates?.[0]?.content?.parts || []) {
-      if (part.inlineData) {
-        const mime = part.inlineData.mimeType || 'image/png';
-        return { type: 'image', content: `data:${mime};base64,${part.inlineData.data}` };
-      }
+        if (part.inlineData) {
+            const mime = part.inlineData.mimeType || 'image/png';
+            return { type: 'image', content: `data:${mime};base64,${part.inlineData.data}` };
+        }
     }
-    
-    // Check if model returned text instead (refusal or confusion)
-    const textPart = response.candidates?.[0]?.content?.parts?.find(p => p.text)?.text;
-    if (textPart) console.warn("Model returned text instead of image:", textPart);
-    
-    return { type: 'text', content: `No pude dibujar "${word}". ¡Usa tu imaginación!` };
-
-  } catch (error: any) {
-    console.warn("Sketch generation failed", error);
-    if (error.message?.includes('429')) rotateApiKey();
-    return { type: 'text', content: `Error de conexión. Intenta de nuevo.` };
+  } catch (flashError) {
+     console.error("Backup image generation failed", flashError);
   }
+
+  return { type: 'text', content: `No pude dibujar "${word}". ¡Usa tu imaginación!` };
 };
 
 export const generateCommentary = async (winnerName: string, score: number, isWin: boolean, style: NarratorStyle): Promise<string> => {
   const fallback = getRandomFallback(winnerName, isWin);
   if (textQuotaExceeded) return fallback;
 
-  // Retrieve strict persona instruction
   const persona = STYLE_PROMPTS[style];
 
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview", 
+      model: "gemini-3-pro-preview", 
       contents: [
         { 
           role: 'user', 
-          // Injecting persona into the user prompt ensures the model adheres to it more strictly than systemInstruction alone
-          parts: [{ text: `${persona}\n\nCONTEXTO: Estás narrando una partida de Pictionary.
-          EVENTO: El jugador "${winnerName}" ${isWin ? `ha GANADO la partida` : `acaba de ganar puntos y lleva`} ${score} puntos.
-          INSTRUCCIÓN: Genera un comentario de 2 a 3 oraciones completas y conectadas (aprox 40-60 palabras).
-          REQUISITO: Mantén tu personalidad al 100%. Sé específico, creativo y no repetitivo. Habla directamente sobre el jugador o la situación. NO des solo el nombre.` }] 
+          parts: [{ text: `
+          TU ROL: ${persona}
+          CONTEXTO: Juego Pictionary. Jugador: "${winnerName}". Situación: ${isWin ? 'GANÓ el juego' : 'Ganó puntos'}. Puntos: ${score}.
+
+          INSTRUCCIÓN:
+          Escribe un discurso de celebración.
+          1. LONGITUD: Entre 60 y 100 palabras. (NI MÁS, NI MENOS).
+          2. FINALIZACIÓN: Tu respuesta DEBE terminar en punto final. No dejes ideas abiertas.
+          3. ESTILO: Exagera tu personalidad al 200%.
+          4. FORMATO: Texto plano.
+          ` }] 
         }
       ],
       config: {
-        maxOutputTokens: 250, 
-        temperature: 0.85, 
+        maxOutputTokens: 2048, // Significantly increased to prevent mid-sentence cutoff
+        temperature: 0.9, 
         topP: 0.95,
       }
     });
@@ -287,15 +298,24 @@ export const generateCommentary = async (winnerName: string, score: number, isWi
     
     text = text.replace(/^["']|["']$/g, '');
 
-    // Validation: If text is too short (likely just a name or one word), use fallback
-    if (text.split(' ').length < 5) {
-        console.warn("Commentary too short, using fallback", text);
-        return fallback; 
+    // SAFETY CHECK: Ensure it ends with punctuation.
+    // If the model got cut off despite the token increase, trim it cleanly.
+    const lastPunctuation = Math.max(text.lastIndexOf('.'), text.lastIndexOf('!'), text.lastIndexOf('?'));
+    
+    if (lastPunctuation !== -1 && lastPunctuation < text.length - 1) {
+        // Text trails off after punctuation
+        text = text.substring(0, lastPunctuation + 1);
+    } else if (lastPunctuation === -1 && text.length > 50) {
+        // No punctuation at all? Force a generic happy ending.
+        text += "... ¡Es simplemente espectacular!";
     }
 
+    if (text.length < 50) return fallback; 
+
     return text;
-  } catch (e) {
+  } catch (e: any) {
     console.error("Commentary Error", e);
+    if (e.message?.includes('429')) rotateApiKey();
     return fallback;
   }
 };
