@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { NarratorStyle, TurnData } from '../types';
-import { playTick, playTone } from '../utils/audio';
+import { playTick, playTone, playAlert } from '../utils/audio';
 import { generateSketch, speakText } from '../services/geminiService';
 import { Timer, Wand2, XCircle, Play, Lightbulb } from 'lucide-react';
 
@@ -30,13 +30,17 @@ const GameCard: React.FC<GameCardProps> = ({ turnData, narratorStyle, onClose })
         setTimeLeft((prev) => {
           const next = prev - 1;
           
-          if (next <= 10 && next > 0) {
-             playTick();
-          } else if (next === 0) {
-             // Strong Buzzer Tone for end
+          // Logic for sounds
+          if (next === 0) {
+             // End of time buzzer
              playTone(150, 'sawtooth', 1.0); 
-             // Speak result
              speakText(`¡Tiempo fuera! La palabra era: ${turnData.word}`, narratorStyle);
+          } else if (next <= 10) {
+             // Ticking for last 10 seconds
+             playTick();
+          } else if (next % 30 === 0) {
+             // Alert every 30 seconds remaining (e.g., at 90, 60, 30)
+             playAlert();
           }
 
           return next;

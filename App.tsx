@@ -5,7 +5,7 @@ import Scoreboard from './components/Scoreboard';
 import SettingsModal from './components/SettingsModal';
 import GameCard from './components/GameCard';
 import { generateCommentary, speakText, stopAudio } from './services/geminiService';
-import { Settings, Users, User, Play, RotateCcw, PenTool, Mic } from 'lucide-react';
+import { Settings, Users, User, Play, RotateCcw, PenTool, Mic, Radio } from 'lucide-react';
 
 // Default Data
 const DEFAULT_CATEGORIES: Category[] = [
@@ -27,6 +27,16 @@ const getSavedSettings = () => {
     console.error("Error loading settings", e);
     return {};
   }
+};
+
+const NARRATOR_LABELS: Record<NarratorStyle, string> = {
+    'DOCUMENTARY': 'Documentalista',
+    'SPORTS': 'Deportivo',
+    'GRANNY': 'Abuelita',
+    'GEN_Z': 'Gen Z',
+    'ROBOT': 'Robot',
+    'SARCASTIC': 'Sarcástico',
+    'POET': 'Poeta'
 };
 
 function App() {
@@ -406,7 +416,16 @@ function App() {
 
       {/* Left Column: Wheel Area */}
       <div className="flex-[2] flex flex-col items-center justify-center relative bg-white/40 rounded-3xl border border-slate-100 shadow-sm p-4">
-        {/* Removed Drawer info from here, kept Settings button only */}
+        
+        {/* Active Narrator Badge */}
+        <div className="absolute top-4 left-4 z-30">
+           <div className="flex items-center gap-2 bg-white/80 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-sm border border-slate-200 text-xs font-bold text-slate-500">
+              <Radio className="w-3 h-3 text-red-500 animate-pulse" />
+              <span>Narrador: {NARRATOR_LABELS[narratorStyle]}</span>
+           </div>
+        </div>
+
+        {/* Settings Button */}
         <div className="absolute top-4 right-4 z-30">
            <button 
             onClick={() => setShowSettings(true)}
