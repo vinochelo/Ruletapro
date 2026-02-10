@@ -1,0 +1,5 @@
+{
+  "name": "Ruleta Pictorica",
+  "description": "An interactive, AI-powered Pictionary style game with a spinning wheel, automatic sketching, smart commentary, and dynamic scoring.",
+  "requestFramePermissions": []
+}
