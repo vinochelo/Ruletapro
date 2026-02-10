@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { GamePhase, Participant, Category, TurnData, ParticipantType, NarratorStyle } from './types';
 import Wheel from './components/Wheel';
 import Scoreboard from './components/Scoreboard';
 import SettingsModal from './components/SettingsModal';
 import GameCard from './components/GameCard';
-import { generateCommentary, speakText } from './services/geminiService';
+import { generateCommentary, speakText, stopAudio } from './services/geminiService';
 import { Settings, Users, User, Play, RotateCcw, PenTool, Mic } from 'lucide-react';
 
 // Default Data
@@ -34,6 +34,8 @@ function App() {
 
   // Game State
   const [phase, setPhase] = useState<GamePhase>('SETUP');
+  const gameSessionRef = useRef<number>(Date.now()); // Tracks the current game session
+  const winLockRef = useRef<boolean>(false); // Prevents multiple API calls for the same win
   
   // Initialize from storage or defaults
   const [participants, setParticipants] = useState<Participant[]>(savedSettings.participants || []);
@@ -107,6 +109,7 @@ function App() {
   const startGame = () => {
     if (participants.length < 2) return alert("¡Se necesitan al menos 2 jugadores/equipos!");
     setDrawerId(participants[0].id); // Default to first player
+    gameSessionRef.current = Date.now(); // Start new session ID
     setPhase('SPIN');
   };
 
@@ -151,12 +154,24 @@ function App() {
 
     // 2. Logic Check
     if (delta > 0) {
+      const currentSessionId = gameSessionRef.current; // Capture current session
+      
       // Check for Game Winner
       if (newScore >= winningScore) {
+        // CRITICAL FIX: Check if we already processed the win to avoid double AI calls
+        if (winLockRef.current) return;
+        
+        winLockRef.current = true; // Lock immediately
         setPhase('WINNER');
-        // Async call for commentary - does NOT block UI
+        
+        // Async call for commentary
         generateCommentary(participants[playerIndex].name, newScore, true, narratorStyle)
-          .then(commentary => setWinCommentary(commentary));
+          .then(commentary => {
+             // Only update if we are still in the same game session
+             if (gameSessionRef.current === currentSessionId) {
+                setWinCommentary(commentary);
+             }
+          });
         return;
       }
 
@@ -169,8 +184,15 @@ function App() {
         // Async call for commentary
         generateCommentary(leader.name, leader.score, false, narratorStyle)
           .then(commentary => {
-             setNotification(commentary);
-             setTimeout(() => setNotification(null), 8000);
+             if (gameSessionRef.current === currentSessionId) {
+                setNotification(commentary);
+                setTimeout(() => {
+                   // Ensure we don't clear someone else's notification if session changed (unlikely for timeout but good practice)
+                   if (gameSessionRef.current === currentSessionId) {
+                      setNotification(null);
+                   }
+                }, 8000);
+             }
           });
       }
     }
@@ -182,10 +204,13 @@ function App() {
   };
 
   const resetGame = () => {
+    stopAudio(); // FORCE STOP all current audio
+    gameSessionRef.current = Date.now(); // Invalidate any pending async commentaries from previous game
+    winLockRef.current = false; // Release the win lock for the new game
+
     setPhase('SETUP');
     // Reset scores but keep players for better UX with persistence
     setParticipants(participants.map(p => ({ ...p, score: 0 })));
-    // FIX: Clear previous game state so it doesn't show up in the new game
     setWinCommentary(null);
     setNotification(null);
   };

@@ -28,6 +28,7 @@ const rotateApiKey = (): boolean => {
 let ttsQuotaExceeded = false;
 let textQuotaExceeded = false;
 let imageQuotaExceeded = false;
+let currentAudioSource: AudioBufferSourceNode | null = null; // Track current audio
 
 // --- FALLBACKS ---
 const FALLBACK_WIN = ["¡Ganaste!", "¡Increíble!", "¡Campeón!"];
@@ -64,6 +65,7 @@ const getVoiceForStyle = (style: NarratorStyle): string => {
 
 const fallbackSpeak = (text: string) => {
     if (!window.speechSynthesis) return;
+    window.speechSynthesis.cancel(); // Stop previous
     const u = new SpeechSynthesisUtterance(text);
     u.lang = 'es-ES';
     window.speechSynthesis.speak(u);
@@ -71,11 +73,26 @@ const fallbackSpeak = (text: string) => {
 
 // --- EXPORTED FUNCTIONS ---
 
+export const stopAudio = () => {
+  if (currentAudioSource) {
+    try {
+      currentAudioSource.stop();
+      currentAudioSource.disconnect();
+    } catch (e) {
+      // ignore
+    }
+    currentAudioSource = null;
+  }
+  if (window.speechSynthesis) {
+    window.speechSynthesis.cancel();
+  }
+};
+
 export const speakText = async (text: string, style: NarratorStyle = 'DOCUMENTARY') => {
+  stopAudio(); // Stop any currently playing audio before starting new one
+  
   if (ttsQuotaExceeded) { fallbackSpeak(text); return; }
 
-  // Fire and forget regarding the loop to avoid blocking UI, but we want to play sound
-  // We wrap in a promise but we don't retry endlessly to keep it snappy
   try {
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash-preview-tts",
@@ -95,6 +112,14 @@ export const speakText = async (text: string, style: NarratorStyle = 'DOCUMENTAR
     const source = ctx.createBufferSource();
     source.buffer = buffer;
     source.connect(ctx.destination);
+    
+    source.onended = () => {
+      if (currentAudioSource === source) {
+        currentAudioSource = null;
+      }
+    };
+    
+    currentAudioSource = source;
     source.start();
 
   } catch (error: any) {
@@ -170,38 +195,61 @@ export const generateMoreWords = async (catName: string, existing: string[]): Pr
 export const generateSketch = async (word: string): Promise<{type: 'image' | 'text', content: string} | null> => {
   if (imageQuotaExceeded) return null;
   
+  // STRATEGY: Try Gemini 2.5 Flash Image first. If it returns text or fails, try Imagen 3.0.
+  
+  // 1. Attempt with Gemini 2.5 Flash Image
   try {
-    // Explicitly requesting an image generation
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash-image", 
       contents: {
         parts: [
-          { text: `Generate a simple, black and white line drawing (sketch style) of a: "${word}". Minimalist, high contrast.` }
+          // Prompt optimized for direct image generation (noun phrase, not instruction)
+          { text: `illustration of a ${word}, simple black outline sketch on white background, pictionary style, minimal.` }
         ]
       },
       config: {
-        // Essential config to trigger image generation capabilities in 2.5 flash image
-        imageConfig: {
-          aspectRatio: "1:1",
-        }
+        imageConfig: { aspectRatio: "1:1" }
       }
     });
 
-    // Check for image first
+    // Check for image
     for (const part of response.candidates?.[0]?.content?.parts || []) {
       if (part.inlineData) {
         return { type: 'image', content: `data:image/png;base64,${part.inlineData.data}` };
       }
     }
 
-    // Fallback: Check if it returned text (a hint) instead of an image
-    // Sometimes the model refuses to draw copyrighted things and returns text.
-    const textPart = response.candidates?.[0]?.content?.parts?.find(p => p.text);
-    if (textPart && textPart.text) {
-        return { type: 'text', content: textPart.text };
+    // If we are here, Gemini returned text or nothing. Save the text just in case we need it as a fallback.
+    const textFallback = response.candidates?.[0]?.content?.parts?.find(p => p.text)?.text;
+
+    // 2. Fallback Attempt with Imagen 3.0 (Dedicated Image Model)
+    try {
+        console.log("Switching to Imagen 3.0 fallback...");
+        const imagenResponse = await ai.models.generateImages({
+            model: 'imagen-3.0-generate-001',
+            prompt: `simple line drawing of ${word}, black ink on white background, minimalist sketch`,
+            config: {
+                numberOfImages: 1,
+                aspectRatio: '1:1',
+                outputMimeType: 'image/jpeg'
+            }
+        });
+
+        const base64 = imagenResponse.generatedImages?.[0]?.image?.imageBytes;
+        if (base64) {
+            return { type: 'image', content: `data:image/jpeg;base64,${base64}` };
+        }
+    } catch (imagenError) {
+        console.warn("Imagen 3.0 fallback failed:", imagenError);
+    }
+
+    // 3. Return text hint if available and both image gens failed
+    if (textFallback) {
+        return { type: 'text', content: textFallback };
     }
 
     return null;
+
   } catch (error: any) {
     console.error("Sketch Error", error);
     if (error.message?.includes('429')) rotateApiKey();
