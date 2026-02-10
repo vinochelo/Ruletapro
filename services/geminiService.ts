@@ -2,9 +2,15 @@ import { GoogleGenAI, Type, Modality } from "@google/genai";
 import { Category, NarratorStyle } from "../types";
 
 // --- API KEY ROTATION LOGIC ---
-const allApiKeys = (process.env.API_KEY || '').split(',').map(k => k.trim()).filter(k => k.length > 0);
+const getApiKeys = () => {
+  const keys = process.env.API_KEY || '';
+  return keys.split(',').map((k: string) => k.trim()).filter((k: string) => k.length > 0);
+};
+
+const allApiKeys = getApiKeys();
 let currentKeyIndex = 0;
-let ai = new GoogleGenAI({ apiKey: allApiKeys[0] || '' });
+// Initialize securely, fallback to empty string to prevent immediate crash if key missing
+let ai = new GoogleGenAI({ apiKey: allApiKeys[0] || 'dummy_key' });
 
 const rotateApiKey = (): boolean => {
   if (currentKeyIndex < allApiKeys.length - 1) {
@@ -72,7 +78,7 @@ const decodePCMAudioData = (base64String: string, audioContext: AudioContext, sa
 
 const getVoiceForStyle = (style: NarratorStyle): string => {
   switch (style) {
-    case 'DOCUMENTARY': return 'Orus'; // Updated to Orus
+    case 'DOCUMENTARY': return 'Orus'; 
     case 'SPORTS': return 'Puck'; 
     case 'GRANNY': return 'Kore'; 
     case 'SARCASTIC': return 'Charon'; 
