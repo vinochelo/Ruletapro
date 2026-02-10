@@ -3,15 +3,24 @@ import { Category, NarratorStyle } from "../types";
 
 // --- API KEY ROTATION LOGIC ---
 const getApiKeys = () => {
-  // En Vite (frontend), las variables se leen desde import.meta.env
-  // Usamos (import.meta as any) para evitar errores de TypeScript durante el build en Vercel
-  const meta = import.meta as any;
-  const keys = meta.env?.VITE_API_KEY || '';
+  let keysString = '';
   
-  const keyList = keys.split(',').map((k: string) => k.trim()).filter((k: string) => k.length > 0);
+  try {
+    // Attempt to access import.meta.env.VITE_API_KEY safely.
+    // In a proper Vite build, this string is statically replaced.
+    // We access it directly to ensure replacement works.
+    // The optional chaining (?.) prevents crash if import.meta.env is missing at runtime (e.g. unit tests or bad builds).
+    keysString = import.meta.env?.VITE_API_KEY || '';
+  } catch (e) {
+    console.error("Environment variable access failed:", e);
+    // Fallback for safety
+    keysString = '';
+  }
+
+  const keyList = keysString.split(',').map((k: string) => k.trim()).filter((k: string) => k.length > 0);
   
   if (keyList.length === 0) {
-    console.error("❌ NO API KEYS FOUND. Ensure VITE_API_KEY is set in Vercel/Environment.");
+    console.error("❌ NO API KEYS FOUND. Ensure VITE_API_KEY is set in Vercel/Environment settings.");
   } else {
     console.log(`✅ Loaded ${keyList.length} API Key(s)`);
   }
