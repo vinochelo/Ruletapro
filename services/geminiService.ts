@@ -3,14 +3,24 @@ import { Category, NarratorStyle } from "../types";
 
 // --- API KEY ROTATION LOGIC ---
 const getApiKeys = () => {
+  // The API key must be obtained exclusively from the environment variable process.env.API_KEY
   const keys = process.env.API_KEY || '';
-  return keys.split(',').map((k: string) => k.trim()).filter((k: string) => k.length > 0);
+  
+  const keyList = keys.split(',').map((k: string) => k.trim()).filter((k: string) => k.length > 0);
+  
+  if (keyList.length === 0) {
+    console.error("❌ NO API KEYS FOUND. Please set process.env.API_KEY.");
+  } else {
+    console.log(`✅ Loaded ${keyList.length} API Key(s)`);
+  }
+  
+  return keyList;
 };
 
 const allApiKeys = getApiKeys();
 let currentKeyIndex = 0;
-// Initialize securely, fallback to empty string to prevent immediate crash if key missing
-let ai = new GoogleGenAI({ apiKey: allApiKeys[0] || 'dummy_key' });
+// Initialize securely, fallback to empty string or dummy to prevent crash, but warn user
+let ai = new GoogleGenAI({ apiKey: allApiKeys[0] || 'dummy_key_missing_configuration' });
 
 const rotateApiKey = (): boolean => {
   if (currentKeyIndex < allApiKeys.length - 1) {
@@ -90,6 +100,9 @@ const getVoiceForStyle = (style: NarratorStyle): string => {
 };
 
 const fallbackSpeak = (text: string, style: NarratorStyle) => {
+    // Basic browser speech synthesis fallback
+    if (!window.speechSynthesis) return;
+
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = 'es-ES';
     
@@ -103,6 +116,7 @@ const fallbackSpeak = (text: string, style: NarratorStyle) => {
       default: utterance.pitch = 1.0; utterance.rate = 1.0;
     }
 
+    // Try to find a Spanish voice
     const voices = window.speechSynthesis.getVoices();
     const preferredGender = ['GRANNY', 'POET', 'ROBOT'].includes(style) ? 'Female' : 'Male';
     const bestVoice = voices.find(v => v.lang.startsWith('es') && v.name.includes(preferredGender)) 
@@ -222,6 +236,8 @@ export const generateNewCategories = async (existingCategories: string[]): Promi
         if (rotateApiKey()) continue;
         textQuotaExceeded = true;
         console.warn("All API Keys exhausted for Text.");
+      } else {
+        console.error("Gemini Text Error:", error);
       }
       return [];
     }
