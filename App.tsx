@@ -214,7 +214,7 @@ function App() {
   };
 
   const resetGame = () => {
-    stopAudio(); // FORCE STOP all current audio
+    // REMOVED: stopAudio(); -> Allowing audio to continue in background while setting up new game.
     gameSessionRef.current = Date.now(); // Invalidate any pending async commentaries from previous game
     winLockRef.current = false; // Release the win lock for the new game
 
