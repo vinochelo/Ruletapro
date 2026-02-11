@@ -5,15 +5,19 @@ import react from '@vitejs/plugin-react'
 export default defineConfig(({ mode }) => {
   // Load env file based on `mode` in the current working directory.
   // Set the third parameter to '' to load all env regardless of the `VITE_` prefix.
-  const env = loadEnv(mode, process.cwd(), '');
+  const env = loadEnv(mode, (process as any).cwd(), '');
   
   // Prioritize VITE_API_KEY if available (Vercel standard), fallback to API_KEY
   const apiKey = env.VITE_API_KEY || env.API_KEY || '';
+  
+  // Specific key for Image Generation (optional, falls back to apiKey if not present)
+  const imageApiKey = env.VITE_IMAGE_API_KEY || '';
 
   return {
     plugins: [react()],
     define: {
-      'process.env.API_KEY': JSON.stringify(apiKey)
+      'process.env.API_KEY': JSON.stringify(apiKey),
+      'process.env.IMAGE_API_KEY': JSON.stringify(imageApiKey)
     }
   }
 })

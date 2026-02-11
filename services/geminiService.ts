@@ -1,6 +1,6 @@
 import { GoogleGenAI, Type, Modality, HarmCategory, HarmBlockThreshold } from "@google/genai";
 import { Category, NarratorStyle } from "../types";
-import { getLocalCommentary } from "../data/narratorPhrases";
+import { getLocalCommentary, PhraseType } from "../data/narratorPhrases";
 
 // --- API KEY MANAGEMENT & ROTATION ---
 const RAW_KEYS = process.env.API_KEY || '';
@@ -8,16 +8,29 @@ const API_KEYS = RAW_KEYS.includes(',')
   ? RAW_KEYS.split(',').map(k => k.trim()).filter(k => k.length > 0)
   : [RAW_KEYS.trim()].filter(k => k.length > 0);
 
+// Dedicated Image Key (Optional)
+const IMAGE_API_KEY = process.env.IMAGE_API_KEY || '';
+
 let currentKeyIndex = 0;
 let ttsQuotaExceeded = false;
 let imageQuotaExceeded = false;
 let currentAudioSource: AudioBufferSourceNode | null = null; 
 
-// Helper: Get Client with current key
+// Helper: Get Client with current key (General Use)
 const getAIClient = (): GoogleGenAI | null => {
   if (API_KEYS.length === 0) return null;
   const key = API_KEYS[currentKeyIndex];
   return new GoogleGenAI({ apiKey: key });
+};
+
+// Helper: Get Client specifically for Images
+const getImageAIClient = (): GoogleGenAI | null => {
+  // 1. Priority: Dedicated Image Key
+  if (IMAGE_API_KEY) {
+    return new GoogleGenAI({ apiKey: IMAGE_API_KEY });
+  }
+  // 2. Fallback: Use the rotation pool
+  return getAIClient();
 };
 
 // Helper: Rotate to next key
@@ -54,16 +67,16 @@ async function withRotationRetry<T>(operation: (ai: GoogleGenAI) => Promise<T>):
 }
 
 // --- PERSONA TO VOICE MAPPING ---
-// Maps the visual/text personality to the most appropriate Gemini Voice
 const getVoiceForStyle = (style: NarratorStyle): string => {
   const map: Record<NarratorStyle, string> = {
-    'DOCUMENTARY': 'Fenrir', // Deep, authoritative
-    'SPORTS': 'Puck',        // Energetic, higher pitch
-    'GRANNY': 'Aoede',       // Soft, mature, refined
-    'SARCASTIC': 'Charon',   // Deep, dry, sometimes flat
-    'ROBOT': 'Zephyr',       // Balanced, can sound slightly more neutral
-    'GEN_Z': 'Puck',         // Energetic, youthful
-    'POET': 'Fenrir'         // Dramatic, deep
+    'DOCUMENTARY': 'Algenib', // User requested: Algenib
+    'SPORTS': 'Puck',
+    'GRANNY': 'Aoede',
+    'SARCASTIC': 'Charon',
+    'ROBOT': 'Zephyr',
+    'GEN_Z': 'Puck',
+    'POET': 'Algieba',        // User requested: Algieba
+    'TELENOVELA': 'Orus'      // User requested: Orus
   };
   return map[style] || 'Puck';
 };
@@ -104,17 +117,10 @@ export const stopAudio = () => {
 
 export const speakText = async (text: string, style: NarratorStyle = 'DOCUMENTARY') => {
   stopAudio();
-  
-  // If we already know quota is exceeded, skip API call immediately
-  if (ttsQuotaExceeded) { 
-    fallbackSpeak(text); 
-    return; 
-  }
+  if (ttsQuotaExceeded) { fallbackSpeak(text); return; }
 
   try {
     await withRotationRetry(async (ai) => {
-      // NOTE: This uses the API for AUDIO generation, NOT text generation.
-      // The text comes from our local file.
       const response = await ai.models.generateContent({
         model: "gemini-2.5-flash-preview-tts",
         contents: [{ parts: [{ text: text }] }],
@@ -148,15 +154,13 @@ export const speakText = async (text: string, style: NarratorStyle = 'DOCUMENTAR
 };
 
 // --- TEXT GENERATION (Strictly Local for Commentary) ---
-export const generateCommentary = (winnerName: string, score: number, isWin: boolean, style: NarratorStyle): Promise<string> => {
-  // STRICT LOCAL ENFORCEMENT: We do NOT call the API here.
-  // We strictly use the phrases from data/narratorPhrases.ts matching the personality.
-  console.log(`🎤 Generating LOCAL commentary for style: ${style}`);
-  const text = getLocalCommentary(style, isWin ? 'WIN' : 'SCORE', winnerName, score);
+export const generateCommentary = (name: string, score: number, type: PhraseType, style: NarratorStyle): Promise<string> => {
+  console.log(`🎤 Generating LOCAL commentary for style: ${style}, Type: ${type}`);
+  const text = getLocalCommentary(style, type, name, score);
   return Promise.resolve(text);
 };
 
-// --- GAME LOGIC GENERATION (Categories/Images still use AI) ---
+// --- GAME LOGIC GENERATION ---
 
 export const generateNewCategories = async (existingCategories: string[]): Promise<Category[]> => {
   try {
@@ -225,36 +229,47 @@ export const generateMoreWords = async (catName: string, existing: string[]): Pr
 
 export const generateSketch = async (word: string): Promise<{type: 'image' | 'text', content: string} | null> => {
   if (imageQuotaExceeded) return null;
-  if (API_KEYS.length === 0) return { type: 'text', content: 'Falta configurar VITE_API_KEY en Vercel.' };
+  
+  // Check if we have any key available
+  const hasImageKey = !!IMAGE_API_KEY;
+  const hasMainKey = API_KEYS.length > 0;
+  
+  if (!hasImageKey && !hasMainKey) return { type: 'text', content: 'Falta configurar VITE_API_KEY o VITE_IMAGE_API_KEY.' };
 
   try {
-    return await withRotationRetry(async (ai) => {
-      console.log(`Generating sketch for "${word}" using gemini-2.5-flash-image...`);
-      const response = await ai.models.generateContent({
-          model: "gemini-2.5-flash-image", 
-          contents: {
-              parts: [{ text: `Create a simple, minimalist, black and white line art drawing of a ${word} on a pure white background. It should look like a Pictionary sketch. No text.` }]
-          },
-          config: {
-              imageConfig: { aspectRatio: "1:1" },
-              safetySettings: [
-                  { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-                  { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
-                  { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
-                  { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-              ]
-          }
-      });
+    // Use Dedicated Image Client Logic
+    const ai = getImageAIClient();
+    if (!ai) throw new Error("MISSING_API_KEY");
 
-      for (const part of response.candidates?.[0]?.content?.parts || []) {
-          if (part.inlineData) {
-              const mime = part.inlineData.mimeType || 'image/png';
-              return { type: 'image', content: `data:${mime};base64,${part.inlineData.data}` };
-          }
-      }
-      return { type: 'text', content: `La IA no devolvió imagen para "${word}".` };
+    console.log(`Generating sketch for "${word}" using gemini-2.5-flash-image...`);
+    const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash-image", 
+        contents: {
+            parts: [{ text: `Create a simple, minimalist, black and white line art drawing of a ${word} on a pure white background. It should look like a Pictionary sketch. No text.` }]
+        },
+        config: {
+            imageConfig: { aspectRatio: "1:1" },
+            safetySettings: [
+                { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+                { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
+                { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
+                { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+            ]
+        }
     });
+
+    for (const part of response.candidates?.[0]?.content?.parts || []) {
+        if (part.inlineData) {
+            const mime = part.inlineData.mimeType || 'image/png';
+            return { type: 'image', content: `data:${mime};base64,${part.inlineData.data}` };
+        }
+    }
+    return { type: 'text', content: `La IA no devolvió imagen para "${word}".` };
+    
   } catch (error: any) {
+     console.error("Image gen error:", error);
+     // If dedicated key fails, we don't automatically rotate main keys unless it was using main keys.
+     // But for simplicity, we mark image quota as exceeded to prevent spamming.
      if (error.message?.includes('429')) imageQuotaExceeded = true;
      return { type: 'text', content: `No pude dibujar "${word}".` };
   }

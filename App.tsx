@@ -5,7 +5,7 @@ import Scoreboard from './components/Scoreboard';
 import SettingsModal from './components/SettingsModal';
 import GameCard from './components/GameCard';
 import { generateCommentary, speakText, stopAudio } from './services/geminiService';
-import { Settings, Users, User, Play, RotateCcw, PenTool, Mic, Radio } from 'lucide-react';
+import { Settings, Users, User, Play, RotateCcw, Mic, Radio } from 'lucide-react';
 
 // Default Data
 const DEFAULT_CATEGORIES: Category[] = [
@@ -36,7 +36,8 @@ const NARRATOR_LABELS: Record<NarratorStyle, string> = {
     'GEN_Z': 'Gen Z',
     'ROBOT': 'Robot',
     'SARCASTIC': 'Sarcástico',
-    'POET': 'Poeta'
+    'POET': 'Poeta',
+    'TELENOVELA': 'Telenovela'
 };
 
 function App() {
@@ -174,8 +175,8 @@ function App() {
         winLockRef.current = true; // Lock immediately
         setPhase('WINNER');
         
-        // Async call for commentary
-        generateCommentary(participants[playerIndex].name, newScore, true, narratorStyle)
+        // Async call for commentary (WIN)
+        generateCommentary(participants[playerIndex].name, newScore, 'WIN', narratorStyle)
           .then(commentary => {
              // Only update if we are still in the same game session
              if (gameSessionRef.current === currentSessionId) {
@@ -185,15 +186,29 @@ function App() {
         return;
       }
 
-      // Check for Leader Notification every 5 total points
+      // Check for Notification every 5 total points to avoid constant chatter
+      // This is a "continue on error" safe logic, if commentary fails, game continues
       const totalPoints = updatedParticipants.reduce((sum, p) => sum + p.score, 0);
       
       if (totalPoints > 0 && totalPoints % 5 === 0) {
-        const leader = [...updatedParticipants].sort((a, b) => b.score - a.score)[0];
+        // Find Leader(s)
+        const sorted = [...updatedParticipants].sort((a, b) => b.score - a.score);
+        const topScore = sorted[0].score;
+        const leaders = sorted.filter(p => p.score === topScore);
+
+        let commentaryPromise;
+
+        if (leaders.length > 1) {
+            // TIE SCENARIO - Trigger distinct tie dialogue
+            const names = leaders.map(l => l.name).join(' y ');
+            commentaryPromise = generateCommentary(names, topScore, 'TIE', narratorStyle);
+        } else {
+            // SINGLE LEADER SCENARIO
+            commentaryPromise = generateCommentary(leaders[0].name, leaders[0].score, 'SCORE', narratorStyle);
+        }
         
         // Async call for commentary
-        generateCommentary(leader.name, leader.score, false, narratorStyle)
-          .then(commentary => {
+        commentaryPromise.then(commentary => {
              if (gameSessionRef.current === currentSessionId) {
                 setNotification(commentary);
                 setTimeout(() => {
@@ -203,7 +218,7 @@ function App() {
                    }
                 }, 8000);
              }
-          });
+          }).catch(err => console.log("Commentary skipped due to error", err));
       }
     }
   };
@@ -214,7 +229,6 @@ function App() {
   };
 
   const resetGame = () => {
-    // REMOVED: stopAudio(); -> Allowing audio to continue in background while setting up new game.
     gameSessionRef.current = Date.now(); // Invalidate any pending async commentaries from previous game
     winLockRef.current = false; // Release the win lock for the new game
 
@@ -256,6 +270,7 @@ function App() {
                 <option value="ROBOT">Robot Futurista</option>
                 <option value="SARCASTIC">Comediante Sarcástico</option>
                 <option value="POET">Poeta Dramático</option>
+                <option value="TELENOVELA">Telenovela (Dramático)</option>
               </select>
             </div>
 
@@ -395,11 +410,9 @@ function App() {
           <div className="text-center p-8 max-w-2xl w-full flex flex-col max-h-screen">
             <h1 className="text-5xl md:text-7xl font-black text-yellow-500 mb-6 drop-shadow-sm animate-pulse shrink-0">¡VICTORIA!</h1>
             <div className="text-3xl md:text-5xl text-slate-800 font-bold mb-8 shrink-0">
-              {/* FIX: Use a safe copy of participants to sort, avoiding in-place mutation of state during render */}
               ¡{[...participants].sort((a,b) => b.score - a.score)[0]?.name} es el campeón!
             </div>
             
-            {/* Scrollable text container to prevent clipping on small screens or with long text */}
             <div className="bg-purple-100 p-6 md:p-8 rounded-3xl max-w-lg mx-auto mb-10 border-4 border-purple-200 shadow-xl overflow-y-auto max-h-[40vh] custom-scrollbar">
               <p className="text-xl md:text-2xl italic text-purple-800 font-serif leading-relaxed">"{winCommentary || '...'}"</p>
             </div>
