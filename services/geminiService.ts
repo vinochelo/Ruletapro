@@ -8,12 +8,11 @@ const API_KEYS = RAW_KEYS.includes(',')
   ? RAW_KEYS.split(',').map(k => k.trim()).filter(k => k.length > 0)
   : [RAW_KEYS.trim()].filter(k => k.length > 0);
 
-// Dedicated Image Key (Optional)
+// Dedicated Image Key (Optional) - Prioritize this for images
 const IMAGE_API_KEY = process.env.IMAGE_API_KEY || '';
 
 let currentKeyIndex = 0;
 let ttsQuotaExceeded = false;
-let imageQuotaExceeded = false;
 let currentAudioSource: AudioBufferSourceNode | null = null; 
 
 // Helper: Get Client with current key (General Use)
@@ -26,10 +25,12 @@ const getAIClient = (): GoogleGenAI | null => {
 // Helper: Get Client specifically for Images
 const getImageAIClient = (): GoogleGenAI | null => {
   // 1. Priority: Dedicated Image Key
-  if (IMAGE_API_KEY) {
+  if (IMAGE_API_KEY && IMAGE_API_KEY.length > 5) {
+    console.log("🎨 Usando API Key INDEPENDIENTE para imágenes.");
     return new GoogleGenAI({ apiKey: IMAGE_API_KEY });
   }
   // 2. Fallback: Use the rotation pool
+  console.log("🔄 Usando API Key COMPARTIDA (Rotation Pool) para imágenes.");
   return getAIClient();
 };
 
@@ -245,27 +246,28 @@ const generateTextHint = async (word: string): Promise<{type: 'text', content: s
 };
 
 export const generateSketch = async (word: string): Promise<{type: 'image' | 'text', content: string} | null> => {
-  if (imageQuotaExceeded) {
-     return generateTextHint(word);
-  }
+  // Removed global blocking flag to allow retries on button click
   
-  const hasImageKey = !!IMAGE_API_KEY;
+  const hasImageKey = !!IMAGE_API_KEY && IMAGE_API_KEY.length > 0;
   const hasMainKey = API_KEYS.length > 0;
   
-  if (!hasImageKey && !hasMainKey) return { type: 'text', content: 'Falta configurar VITE_API_KEY en Vercel.' };
+  if (!hasImageKey && !hasMainKey) return { type: 'text', content: 'Falta configurar VITE_API_KEY o VITE_IMAGE_API_KEY en Vercel.' };
 
   try {
+    // Force get the appropriate client
     const ai = getImageAIClient();
     if (!ai) throw new Error("MISSING_API_KEY");
 
-    console.log(`Generating sketch for "${word}" using gemini-2.5-flash-image...`);
+    console.log(`🎨 Generando imagen para "${word}" con gemini-2.5-flash-image...`);
+    
     const response = await ai.models.generateContent({
         model: "gemini-2.5-flash-image", 
         contents: {
-            parts: [{ text: `Create a simple, minimalist, black and white line art drawing of a ${word} on a pure white background. It should look like a Pictionary sketch. No text.` }]
+            parts: [{ text: `Create a simple, minimalist, black and white line art drawing of a ${word} on a pure white background. It should look like a Pictionary sketch. High contrast. No text.` }]
         },
         config: {
             imageConfig: { aspectRatio: "1:1" },
+            // Permissive safety settings to avoid false positives blocking the drawing
             safetySettings: [
                 { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
                 { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
@@ -281,13 +283,12 @@ export const generateSketch = async (word: string): Promise<{type: 'image' | 'te
             return { type: 'image', content: `data:${mime};base64,${part.inlineData.data}` };
         }
     }
-    throw new Error("No image data in response");
+    throw new Error("La respuesta de IA no contenía datos de imagen.");
     
   } catch (error: any) {
-     console.error("Image gen error:", error);
-     if (error.message?.includes('429')) imageQuotaExceeded = true;
+     console.error("❌ Error generando imagen (Se usará pista de texto):", error);
      
-     // Fallback to text hint if image generation fails (common in production/free tier)
+     // Only fallback to text hint if image generation strictly fails
      return generateTextHint(word);
   }
 };
