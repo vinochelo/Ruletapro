@@ -54,10 +54,21 @@ const GameCard: React.FC<GameCardProps> = ({ turnData, narratorStyle, onClose })
   }, [isActive, timeLeft, turnData.word, narratorStyle]);
 
   const handleGenerateSketch = async () => {
+    if (loadingImage) return;
     setLoadingImage(true);
-    const result = await generateSketch(turnData.word);
-    setGeneratedContent(result);
-    setLoadingImage(false);
+    try {
+      const result = await generateSketch(turnData.word);
+      if (result) {
+        setGeneratedContent(result);
+      } else {
+        setGeneratedContent({ type: 'text', content: 'No se pudo conectar con la IA.' });
+      }
+    } catch (error) {
+      console.error("Error UI:", error);
+      setGeneratedContent({ type: 'text', content: 'Error al solicitar el dibujo.' });
+    } finally {
+      setLoadingImage(false);
+    }
   };
 
   const isUrgent = timeLeft <= 10;
@@ -114,17 +125,17 @@ const GameCard: React.FC<GameCardProps> = ({ turnData, narratorStyle, onClose })
           {(generatedContent || !isFinished) && (
             <div className="w-full flex justify-center py-2 shrink-0 pb-4">
                {generatedContent ? (
-                  <div className="relative group w-full max-w-sm flex flex-col items-center">
+                  <div className="relative group w-full max-w-sm flex flex-col items-center animate-in fade-in zoom-in duration-300">
                     {generatedContent.type === 'image' ? (
                        <>
                         <img src={generatedContent.content} alt="AI Hint" className="w-full h-auto max-h-[250px] object-contain rounded-lg border-2 border-slate-200 shadow-lg bg-white" />
                         <span className="mt-2 text-xs text-slate-400 font-medium">Boceto generado por IA</span>
                        </>
                     ) : (
-                      <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-xl text-yellow-800 text-center shadow-sm">
+                      <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-xl text-yellow-800 text-center shadow-sm w-full">
                         <div className="flex justify-center mb-2 text-yellow-500"><Lightbulb size={24} /></div>
                         <p className="font-bold mb-1">Pista de texto (IA no pudo dibujar):</p>
-                        <p className="text-sm italic">{generatedContent.content}</p>
+                        <p className="text-sm italic">"{generatedContent.content}"</p>
                       </div>
                     )}
                   </div>
@@ -133,10 +144,10 @@ const GameCard: React.FC<GameCardProps> = ({ turnData, narratorStyle, onClose })
                     <button 
                       onClick={handleGenerateSketch}
                       disabled={loadingImage}
-                      className="flex items-center gap-2 px-5 py-2 bg-purple-100 hover:bg-purple-200 text-purple-700 rounded-full font-bold transition-colors text-sm"
+                      className="flex items-center gap-2 px-6 py-3 bg-purple-100 hover:bg-purple-200 text-purple-700 rounded-full font-bold transition-all text-sm shadow-sm hover:shadow-md active:scale-95"
                     >
-                      {loadingImage ? <span className="animate-spin">✨</span> : <Wand2 className="w-4 h-4" />}
-                      {loadingImage ? 'Dibujando...' : 'Pedir ayuda a la IA (Boceto)'}
+                      {loadingImage ? <span className="animate-spin text-lg">✨</span> : <Wand2 className="w-5 h-5" />}
+                      {loadingImage ? 'Generando pista...' : 'Pedir pista visual (IA)'}
                     </button>
                   )
                )}
