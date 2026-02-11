@@ -227,17 +227,34 @@ export const generateMoreWords = async (catName: string, existing: string[]): Pr
   } catch (e) { return []; }
 };
 
+// Helper: Generate a text hint when image generation fails
+const generateTextHint = async (word: string): Promise<{type: 'text', content: string}> => {
+    try {
+        const ai = getAIClient();
+        if (!ai) return { type: 'text', content: `No pude dibujar "${word}" (Falta API Key).` };
+        
+        const response = await ai.models.generateContent({
+            model: "gemini-3-flash-preview",
+            contents: `Juego Pictionary: Dame una descripción visual breve y críptica para que adivinen la palabra "${word}". ¡NO menciones la palabra "${word}" ni su raíz! Máximo 20 palabras.`,
+        });
+        const text = response.text;
+        return { type: 'text', content: text || `Pista: Intenta adivinar "${word}".` };
+    } catch (e) {
+        return { type: 'text', content: `No pude dibujar "${word}".` };
+    }
+};
+
 export const generateSketch = async (word: string): Promise<{type: 'image' | 'text', content: string} | null> => {
-  if (imageQuotaExceeded) return null;
+  if (imageQuotaExceeded) {
+     return generateTextHint(word);
+  }
   
-  // Check if we have any key available
   const hasImageKey = !!IMAGE_API_KEY;
   const hasMainKey = API_KEYS.length > 0;
   
-  if (!hasImageKey && !hasMainKey) return { type: 'text', content: 'Falta configurar VITE_API_KEY o VITE_IMAGE_API_KEY.' };
+  if (!hasImageKey && !hasMainKey) return { type: 'text', content: 'Falta configurar VITE_API_KEY en Vercel.' };
 
   try {
-    // Use Dedicated Image Client Logic
     const ai = getImageAIClient();
     if (!ai) throw new Error("MISSING_API_KEY");
 
@@ -264,13 +281,13 @@ export const generateSketch = async (word: string): Promise<{type: 'image' | 'te
             return { type: 'image', content: `data:${mime};base64,${part.inlineData.data}` };
         }
     }
-    return { type: 'text', content: `La IA no devolvió imagen para "${word}".` };
+    throw new Error("No image data in response");
     
   } catch (error: any) {
      console.error("Image gen error:", error);
-     // If dedicated key fails, we don't automatically rotate main keys unless it was using main keys.
-     // But for simplicity, we mark image quota as exceeded to prevent spamming.
      if (error.message?.includes('429')) imageQuotaExceeded = true;
-     return { type: 'text', content: `No pude dibujar "${word}".` };
+     
+     // Fallback to text hint if image generation fails (common in production/free tier)
+     return generateTextHint(word);
   }
 };
