@@ -14,11 +14,8 @@ const API_KEYS = RAW_KEYS.includes(',')
 // Dedicated Image Key (Optional) - Prioritize this for images
 const IMAGE_API_KEY = sanitizeKey(process.env.IMAGE_API_KEY || '');
 
-// --- DEBUG LOGGING (Safe) ---
-// This runs once on load to help verify Vercel configuration in browser console
-console.log("🔧 Configuración de API:");
-console.log(`- API Keys Principales: ${API_KEYS.length} disponibles.`);
-console.log(`- API Key Imágenes (Independiente): ${IMAGE_API_KEY && IMAGE_API_KEY.length > 5 ? `Configurada (${IMAGE_API_KEY.substring(0, 4)}...)` : 'No configurada (Usará pool principal)'}.`);
+// --- DEBUG LOGGING ---
+console.log(`🔧 API Config: ${API_KEYS.length} keys loaded. Image Key: ${IMAGE_API_KEY ? 'Present' : 'Not Set'}. Origin: ${typeof window !== 'undefined' ? window.location.origin : 'Server'}`);
 
 let currentKeyIndex = 0;
 let ttsQuotaExceeded = false;
@@ -36,7 +33,7 @@ const rotateKey = () => {
   if (API_KEYS.length <= 1) return;
   const prevIndex = currentKeyIndex;
   currentKeyIndex = (currentKeyIndex + 1) % API_KEYS.length;
-  console.log(`⚠️ API Quota limit or error. Rotating key index: ${prevIndex} -> ${currentKeyIndex}`);
+  console.log(`⚠️ Rotating API Key: ${prevIndex} -> ${currentKeyIndex}`);
 };
 
 // Helper: Retry Wrapper for API calls
@@ -151,7 +148,6 @@ export const speakText = async (text: string, style: NarratorStyle = 'DOCUMENTAR
   }
 };
 
-// --- TEXT GENERATION (Strictly Local for Commentary) ---
 export const generateCommentary = (name: string, score: number, type: PhraseType, style: NarratorStyle): Promise<string> => {
   console.log(`🎤 Generating LOCAL commentary for style: ${style}, Type: ${type}`);
   const text = getLocalCommentary(style, type, name, score);
@@ -225,7 +221,6 @@ export const generateMoreWords = async (catName: string, existing: string[]): Pr
   } catch (e) { return []; }
 };
 
-// Helper: Generate a text hint when image generation fails
 const generateTextHint = async (word: string): Promise<{type: 'text', content: string}> => {
     try {
         const ai = getAIClient(); 
@@ -242,106 +237,98 @@ const generateTextHint = async (word: string): Promise<{type: 'text', content: s
     }
 };
 
+// --- IMAGE GENERATION (With SVG Fallback) ---
 export const generateSketch = async (word: string): Promise<{type: 'image' | 'text', content: string} | null> => {
-  // --- STRATEGY: Quadruple Fallback ---
-  // 1. Dedicated Key + Gemini 2.5
-  // 2. Main Key + Gemini 2.5
-  // 3. Dedicated Key + Imagen 3 (New fallback model)
-  // 4. Main Key + Imagen 3
-  // 5. Text Hint
-
   const prompt = `Draw a simple, minimalist, black and white line art sketch representing the concept: "${word}". Style: Pictionary drawing on white background. High contrast. No text.`;
 
-  // Method 1: Gemini 2.5 Flash Image (Content Generation)
+  // 1. Try Gemini 2.5 (Fastest, High Quality)
   const tryGemini25 = async (client: GoogleGenAI, debugLabel: string) => {
-      console.log(`🎨 [${debugLabel}] Trying Gemini 2.5 Flash Image for "${word}"...`);
+      console.log(`🎨 [${debugLabel}] Trying Gemini 2.5 for "${word}"...`);
       const response = await client.models.generateContent({
         model: "gemini-2.5-flash-image", 
         contents: { parts: [{ text: prompt }] },
-        config: {
-            imageConfig: { aspectRatio: "1:1" },
-            safetySettings: [
-                { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-                { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
-                { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
-                { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-            ]
-        }
+        config: { imageConfig: { aspectRatio: "1:1" } } // Minimal config
     });
-    // Extract Image
     for (const part of response.candidates?.[0]?.content?.parts || []) {
       if (part.inlineData) {
-          const mime = part.inlineData.mimeType || 'image/png';
-          return { type: 'image' as const, content: `data:${mime};base64,${part.inlineData.data}` };
+          return { type: 'image' as const, content: `data:${part.inlineData.mimeType};base64,${part.inlineData.data}` };
       }
     }
     throw new Error("No image data in Gemini 2.5 response");
   };
 
-  // Method 2: Imagen 3 (Image Generation)
+  // 2. Try Imagen 3 (Robust Fallback)
   const tryImagen3 = async (client: GoogleGenAI, debugLabel: string) => {
     console.log(`🎨 [${debugLabel}] Trying Imagen 3.0 for "${word}"...`);
+    // Imagen uses a distinct method
     const response = await client.models.generateImages({
         model: 'imagen-3.0-generate-001',
         prompt: prompt,
-        config: {
-            numberOfImages: 1,
-            aspectRatio: '1:1',
-            outputMimeType: 'image/jpeg'
-        }
+        config: { numberOfImages: 1, aspectRatio: '1:1', outputMimeType: 'image/jpeg' }
     });
     const base64 = response.generatedImages?.[0]?.image?.imageBytes;
-    if (base64) {
-        return { type: 'image' as const, content: `data:image/jpeg;base64,${base64}` };
-    }
+    if (base64) return { type: 'image' as const, content: `data:image/jpeg;base64,${base64}` };
     throw new Error("No image data in Imagen 3.0 response");
   };
 
-  try {
-      let result;
+  // 3. SVG GENERATOR (Text Model Fallback - Bypasses Image Quota)
+  const trySVGGenerator = async (client: GoogleGenAI, debugLabel: string) => {
+      console.log(`🎨 [${debugLabel}] Generating SVG via Text Model for "${word}"...`);
+      const svgPrompt = `Create a simple, black strokes on white background SVG XML code for a Pictionary-style drawing of: "${word}". Use minimal paths. The output must be ONLY the raw <svg>...</svg> code. No markdown, no explanation.`;
       
-      // 1. Dedicated Key + Gemini 2.5
+      const response = await client.models.generateContent({
+          model: "gemini-3-flash-preview", // Uses TEXT quota, not image quota
+          contents: svgPrompt
+      });
+      
+      let svgCode = response.text || '';
+      // Clean up markdown code blocks if present
+      svgCode = svgCode.replace(/```svg/g, '').replace(/```xml/g, '').replace(/```/g, '').trim();
+      
+      if (svgCode.includes('<svg')) {
+          const base64SVG = btoa(unescape(encodeURIComponent(svgCode)));
+          return { type: 'image' as const, content: `data:image/svg+xml;base64,${base64SVG}` };
+      }
+      throw new Error("Failed to generate valid SVG");
+  };
+
+  try {
+      // 1. Dedicated Key Image Gen
       if (IMAGE_API_KEY.length > 5) {
           try {
-             const ai = new GoogleGenAI({ apiKey: IMAGE_API_KEY });
-             result = await tryGemini25(ai, "DEDICATED_KEY");
-             return result;
-          } catch (e: any) { console.warn(`⚠️ Dedicated/Gemini2.5 failed: ${e.message}`); }
-      }
+             return await tryGemini25(new GoogleGenAI({ apiKey: IMAGE_API_KEY }), "DEDICATED_G2.5");
+          } catch (e: any) { console.warn(`Dedicated G2.5 failed: ${e.message}`); }
 
-      // 2. Main Key + Gemini 2.5
-      if (API_KEYS.length > 0) {
           try {
-            await withRotationRetry(async (ai) => {
-                result = await tryGemini25(ai, "MAIN_KEY_POOL");
-            });
-            if (result) return result;
-          } catch(e: any) { console.warn(`⚠️ Main/Gemini2.5 failed: ${e.message}`); }
+             return await tryImagen3(new GoogleGenAI({ apiKey: IMAGE_API_KEY }), "DEDICATED_IMG3");
+          } catch (e: any) { console.warn(`Dedicated IMG3 failed: ${e.message}`); }
       }
 
-      // 3. Dedicated Key + Imagen 3 (Fallback)
-      if (IMAGE_API_KEY.length > 5) {
-        try {
-           const ai = new GoogleGenAI({ apiKey: IMAGE_API_KEY });
-           result = await tryImagen3(ai, "DEDICATED_KEY_IMAGEN");
-           return result;
-        } catch (e: any) { console.warn(`⚠️ Dedicated/Imagen3 failed: ${e.message}`); }
-      }
-
-      // 4. Main Key + Imagen 3 (Fallback)
+      // 2. Main Key Image Gen
       if (API_KEYS.length > 0) {
-        try {
-            await withRotationRetry(async (ai) => {
-                result = await tryImagen3(ai, "MAIN_KEY_POOL_IMAGEN");
-            });
-            if (result) return result;
-        } catch(e: any) { console.error(`❌ Main/Imagen3 failed: ${e.message}`); }
+          // Try G2.5
+          try {
+             const result = await withRotationRetry(ai => tryGemini25(ai, "MAIN_G2.5"));
+             if(result) return result;
+          } catch (e: any) { console.warn(`Main G2.5 failed: ${e.message}`); }
+
+          // Try Imagen 3
+          try {
+             const result = await withRotationRetry(ai => tryImagen3(ai, "MAIN_IMG3"));
+             if(result) return result;
+          } catch (e: any) { console.warn(`Main IMG3 failed: ${e.message}`); }
+          
+          // 3. SVG FALLBACK (The Ultimate Safety Net)
+          try {
+              const result = await withRotationRetry(ai => trySVGGenerator(ai, "SVG_FALLBACK"));
+              if(result) return result;
+          } catch (e: any) { console.warn(`SVG Gen failed: ${e.message}`); }
       }
 
-      throw new Error("All image generation attempts failed.");
+      throw new Error("All generation methods failed");
 
   } catch (error: any) {
-     console.error("❌ Fatal Image Generation Error. Falling back to text hint.", error);
+     console.error("❌ Fatal Generation Error. Using text hint.", error);
      return generateTextHint(word);
   }
 };
