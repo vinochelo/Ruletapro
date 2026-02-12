@@ -237,9 +237,16 @@ const generateTextHint = async (word: string): Promise<{type: 'text', content: s
     }
 };
 
-// --- IMAGE GENERATION (With SVG Fallback) ---
+// --- IMAGE GENERATION (With Robust SVG Fallback) ---
 export const generateSketch = async (word: string): Promise<{type: 'image' | 'text', content: string} | null> => {
   const prompt = `Draw a simple, minimalist, black and white line art sketch representing the concept: "${word}". Style: Pictionary drawing on white background. High contrast. No text.`;
+
+  const commonSafetySettings = [
+    { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+    { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
+    { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
+    { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+  ];
 
   // 1. Try Gemini 2.5 (Fastest, High Quality)
   const tryGemini25 = async (client: GoogleGenAI, debugLabel: string) => {
@@ -247,7 +254,10 @@ export const generateSketch = async (word: string): Promise<{type: 'image' | 'te
       const response = await client.models.generateContent({
         model: "gemini-2.5-flash-image", 
         contents: { parts: [{ text: prompt }] },
-        config: { imageConfig: { aspectRatio: "1:1" } } // Minimal config
+        config: { 
+            imageConfig: { aspectRatio: "1:1" },
+            safetySettings: commonSafetySettings
+        } 
     });
     for (const part of response.candidates?.[0]?.content?.parts || []) {
       if (part.inlineData) {
@@ -260,7 +270,6 @@ export const generateSketch = async (word: string): Promise<{type: 'image' | 'te
   // 2. Try Imagen 3 (Robust Fallback)
   const tryImagen3 = async (client: GoogleGenAI, debugLabel: string) => {
     console.log(`🎨 [${debugLabel}] Trying Imagen 3.0 for "${word}"...`);
-    // Imagen uses a distinct method
     const response = await client.models.generateImages({
         model: 'imagen-3.0-generate-001',
         prompt: prompt,
@@ -274,22 +283,42 @@ export const generateSketch = async (word: string): Promise<{type: 'image' | 'te
   // 3. SVG GENERATOR (Text Model Fallback - Bypasses Image Quota)
   const trySVGGenerator = async (client: GoogleGenAI, debugLabel: string) => {
       console.log(`🎨 [${debugLabel}] Generating SVG via Text Model for "${word}"...`);
-      const svgPrompt = `Create a simple, black strokes on white background SVG XML code for a Pictionary-style drawing of: "${word}". Use minimal paths. The output must be ONLY the raw <svg>...</svg> code. No markdown, no explanation.`;
       
-      const response = await client.models.generateContent({
-          model: "gemini-3-flash-preview", // Uses TEXT quota, not image quota
-          contents: svgPrompt
-      });
-      
-      let svgCode = response.text || '';
-      // Clean up markdown code blocks if present
-      svgCode = svgCode.replace(/```svg/g, '').replace(/```xml/g, '').replace(/```/g, '').trim();
-      
-      if (svgCode.includes('<svg')) {
-          const base64SVG = btoa(unescape(encodeURIComponent(svgCode)));
-          return { type: 'image' as const, content: `data:image/svg+xml;base64,${base64SVG}` };
+      try {
+        const response = await client.models.generateContent({
+          model: "gemini-3-flash-preview", 
+          contents: `Create a simple, black and white SVG drawing for "${word}". Pictionary style. Minimalist stroke art.`,
+          config: {
+              responseMimeType: "application/json",
+              responseSchema: {
+                  type: Type.OBJECT,
+                  properties: {
+                      svg_code: { 
+                          type: Type.STRING, 
+                          description: "Raw XML SVG code starting with <svg> and ending with </svg>. ViewBox must be defined." 
+                      }
+                  }
+              },
+              safetySettings: commonSafetySettings
+          }
+        });
+        
+        const json = JSON.parse(response.text || '{}');
+        let svgCode = json.svg_code || '';
+        
+        // Clean markdown just in case
+        svgCode = svgCode.replace(/```xml/g, '').replace(/```svg/g, '').replace(/```/g, '').trim();
+
+        if (svgCode.toLowerCase().includes('<svg')) {
+            const base64SVG = btoa(unescape(encodeURIComponent(svgCode)));
+            return { type: 'image' as const, content: `data:image/svg+xml;base64,${base64SVG}` };
+        }
+        throw new Error("Invalid SVG structure in JSON response");
+      } catch (e: any) {
+        // Log detailed error for SVG failure
+        console.error(`SVG Generator Failed:`, e);
+        throw e;
       }
-      throw new Error("Failed to generate valid SVG");
   };
 
   try {
