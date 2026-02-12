@@ -14,7 +14,7 @@ export interface Participant {
   avatar?: string;
 }
 
-export type NarratorStyle = 'DOCUMENTARY' | 'SPORTS' | 'GRANNY' | 'SARCASTIC' | 'ROBOT' | 'GEN_Z' | 'POET' | 'TELENOVELA';
+export type NarratorStyle = 'DOCUMENTARY' | 'SPORTS' | 'GRANNY' | 'SARCASTIC' | 'ROBOT' | 'GEN_Z' | 'POET' | 'TELENOVELA' | 'ALIEN';
 
 export interface GameSettings {
   mode: ParticipantType;

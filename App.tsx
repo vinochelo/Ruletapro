@@ -5,7 +5,7 @@ import Scoreboard from './components/Scoreboard';
 import SettingsModal from './components/SettingsModal';
 import GameCard from './components/GameCard';
 import { generateCommentary, speakText, stopAudio } from './services/geminiService';
-import { Settings, Users, User, Play, RotateCcw, Mic, Radio } from 'lucide-react';
+import { Settings, Users, User, Play, RotateCcw, Mic, Radio, Home } from 'lucide-react';
 
 // Default Data
 const DEFAULT_CATEGORIES: Category[] = [
@@ -37,7 +37,8 @@ const NARRATOR_LABELS: Record<NarratorStyle, string> = {
     'ROBOT': 'Robot',
     'SARCASTIC': 'Sarcástico',
     'POET': 'Poeta',
-    'TELENOVELA': 'Telenovela'
+    'TELENOVELA': 'Telenovela',
+    'ALIEN': 'Invasor Alien'
 };
 
 function App() {
@@ -125,6 +126,11 @@ function App() {
     setDrawerId(participants[0].id); // Default to first player
     gameSessionRef.current = Date.now(); // Start new session ID
     setPhase('SPIN');
+  };
+
+  const goToSetup = () => {
+    // Removed window.confirm to ensure immediate feedback and prevent blocking issues
+    setPhase('SETUP');
   };
 
   const handleSpin = () => {
@@ -293,6 +299,7 @@ function App() {
                 <option value="GRANNY">Abuela Cariñosa</option>
                 <option value="GEN_Z">Gen Z (Streamer)</option>
                 <option value="ROBOT">Robot Futurista</option>
+                <option value="ALIEN">Invasor Alienígena</option>
                 <option value="SARCASTIC">Comediante Sarcástico</option>
                 <option value="POET">Poeta Dramático</option>
                 <option value="TELENOVELA">Telenovela (Dramático)</option>
@@ -400,7 +407,7 @@ function App() {
 
   // Main Game Layout
   return (
-    <div className="min-h-screen flex flex-col md:flex-row items-stretch p-4 gap-4 max-w-[1600px] mx-auto bg-slate-50/50 overflow-hidden">
+    <div className="min-h-screen flex flex-col md:flex-row items-stretch p-4 gap-4 max-w-[1600px] mx-auto bg-slate-50/50 overflow-hidden relative">
       
       {/* Settings Modal */}
       {showSettings && (
@@ -455,11 +462,11 @@ function App() {
       {/* Left Column: Wheel Area */}
       <div className="flex-[2] flex flex-col items-center justify-center relative bg-white/40 rounded-3xl border border-slate-100 shadow-sm p-4">
         
-        {/* Active Narrator Badge */}
-        <div className="absolute top-4 left-4 z-30">
+        {/* Active Narrator Badge - Adjusted spacing to not overlap Home button in desktop view if needed, but Home is now outside */}
+        <div className="absolute top-4 left-4 md:left-28 z-30">
            <div className="flex items-center gap-2 bg-white/80 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-sm border border-slate-200 text-xs font-bold text-slate-500">
               <Radio className="w-3 h-3 text-red-500 animate-pulse" />
-              <span>Narrador: {NARRATOR_LABELS[narratorStyle]}</span>
+              <span>{NARRATOR_LABELS[narratorStyle]}</span>
            </div>
         </div>
 
@@ -500,6 +507,19 @@ function App() {
           onSetDrawer={setDrawerId}
         />
       </div>
+
+      {/* Home / Exit Button - MOVED HERE (GLOBAL CONTEXT) TO ENSURE CLICKABILITY */}
+      <div className="absolute top-4 left-4 z-[60] cursor-pointer">
+        <button 
+          onClick={goToSetup}
+          className="p-3 bg-white hover:bg-red-50 text-slate-600 hover:text-red-500 rounded-full shadow-md border border-slate-200 transition-all active:scale-95 flex items-center gap-2 font-bold group"
+          title="Volver a Configuración"
+        >
+          <Home className="w-6 h-6" />
+          <span className="hidden md:block max-w-0 overflow-hidden group-hover:max-w-xs transition-all duration-300 ease-in-out whitespace-nowrap text-sm">Menú</span>
+        </button>
+      </div>
+
     </div>
   );
 }

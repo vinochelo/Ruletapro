@@ -71,7 +71,8 @@ const getVoiceForStyle = (style: NarratorStyle): string => {
     'ROBOT': 'Zephyr',
     'GEN_Z': 'Puck',
     'POET': 'Algieba',
-    'TELENOVELA': 'Orus'
+    'TELENOVELA': 'Orus',
+    'ALIEN': 'Kore'
   };
   return map[style] || 'Puck';
 };

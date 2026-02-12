@@ -50,8 +50,10 @@ const Wheel: React.FC<WheelProps> = ({ categories, onSpinEnd, isSpinning, onSpin
       .value(1)
       .sort(null);
 
+    // CHANGED: innerRadius set to 0 to prevent "white line" artifacts near center.
+    // The HTML center hub covers the middle anyway.
     const arc = d3.arc<d3.PieArcDatum<Category>>()
-      .innerRadius(60) 
+      .innerRadius(0) 
       .outerRadius(radius - 10);
 
     // Filters
@@ -87,15 +89,12 @@ const Wheel: React.FC<WheelProps> = ({ categories, onSpinEnd, isSpinning, onSpin
       .attr("stroke-width", "4px")
       .style("filter", "url(#wheel-shadow)");
 
-    // Text labels - Fixed positioning logic
+    // Text labels
     arcs.append("text")
       .attr("transform", function(d) {
-        // Calculate the angle for the rotation
         const angle = (d.startAngle + d.endAngle) / 2 * (180 / Math.PI);
         
-        // Calculate position manually to ensure it is within bounds
-        // Radius is ~300. We want it at around 220px from center (75% out)
-        // Adjust angle to radians for Math.cos/sin (subtract 90deg because 0 is up)
+        // Fixed text distance from center
         const textRadius = radius * 0.75;
         const rads = (d.startAngle + d.endAngle) / 2 - Math.PI / 2;
         const x = Math.cos(rads) * textRadius;
@@ -113,7 +112,7 @@ const Wheel: React.FC<WheelProps> = ({ categories, onSpinEnd, isSpinning, onSpin
       .style("font-weight", "800")
       .style("font-family", "Fredoka, sans-serif")
       .style("font-size", "14px")
-      .style("pointer-events", "none"); // Allow clicking through text
+      .style("pointer-events", "none");
 
   }, [categories]);
 
@@ -156,8 +155,8 @@ const Wheel: React.FC<WheelProps> = ({ categories, onSpinEnd, isSpinning, onSpin
             transform: `rotate(${rotation}deg)` 
           }}
         />
-        {/* Center hub */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[22%] h-[22%] bg-white rounded-full shadow-lg border-8 border-slate-100 flex items-center justify-center z-10">
+        {/* Center hub - Slightly larger to ensure coverage of inner join */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[24%] h-[24%] bg-white rounded-full shadow-lg border-8 border-slate-100 flex items-center justify-center z-10">
             <div className="w-3/4 h-3/4 bg-slate-800 rounded-full flex items-center justify-center shadow-inner">
               {!isSpinning && <span className="text-white text-sm md:text-base font-black tracking-widest">GIRAR</span>}
             </div>
