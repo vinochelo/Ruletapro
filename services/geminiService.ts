@@ -3,13 +3,22 @@ import { Category, NarratorStyle } from "../types";
 import { getLocalCommentary, PhraseType } from "../data/narratorPhrases";
 
 // --- API KEY MANAGEMENT & ROTATION ---
-const RAW_KEYS = process.env.API_KEY || '';
+// Sanitize keys to remove accidental whitespace from copy-pasting
+const sanitizeKey = (k: string) => k ? k.trim().replace(/["']/g, "") : "";
+
+const RAW_KEYS = sanitizeKey(process.env.API_KEY || '');
 const API_KEYS = RAW_KEYS.includes(',') 
   ? RAW_KEYS.split(',').map(k => k.trim()).filter(k => k.length > 0)
-  : [RAW_KEYS.trim()].filter(k => k.length > 0);
+  : [RAW_KEYS].filter(k => k.length > 0);
 
 // Dedicated Image Key (Optional) - Prioritize this for images
-const IMAGE_API_KEY = process.env.IMAGE_API_KEY || '';
+const IMAGE_API_KEY = sanitizeKey(process.env.IMAGE_API_KEY || '');
+
+// --- DEBUG LOGGING (Safe) ---
+// This runs once on load to help verify Vercel configuration in browser console
+console.log("🔧 Configuración de API:");
+console.log(`- API Keys Principales: ${API_KEYS.length} disponibles.`);
+console.log(`- API Key Imágenes (Independiente): ${IMAGE_API_KEY && IMAGE_API_KEY.length > 5 ? `Configurada (${IMAGE_API_KEY.substring(0, 4)}...)` : 'No configurada (Usará pool principal)'}.`);
 
 let currentKeyIndex = 0;
 let ttsQuotaExceeded = false;
@@ -20,18 +29,6 @@ const getAIClient = (): GoogleGenAI | null => {
   if (API_KEYS.length === 0) return null;
   const key = API_KEYS[currentKeyIndex];
   return new GoogleGenAI({ apiKey: key });
-};
-
-// Helper: Get Client specifically for Images
-const getImageAIClient = (): GoogleGenAI | null => {
-  // 1. Priority: Dedicated Image Key
-  if (IMAGE_API_KEY && IMAGE_API_KEY.length > 5) {
-    console.log("🎨 Usando API Key INDEPENDIENTE para imágenes.");
-    return new GoogleGenAI({ apiKey: IMAGE_API_KEY });
-  }
-  // 2. Fallback: Use the rotation pool
-  console.log("🔄 Usando API Key COMPARTIDA (Rotation Pool) para imágenes.");
-  return getAIClient();
 };
 
 // Helper: Rotate to next key
@@ -70,14 +67,14 @@ async function withRotationRetry<T>(operation: (ai: GoogleGenAI) => Promise<T>):
 // --- PERSONA TO VOICE MAPPING ---
 const getVoiceForStyle = (style: NarratorStyle): string => {
   const map: Record<NarratorStyle, string> = {
-    'DOCUMENTARY': 'Algenib', // User requested: Algenib
+    'DOCUMENTARY': 'Algenib',
     'SPORTS': 'Puck',
     'GRANNY': 'Aoede',
     'SARCASTIC': 'Charon',
     'ROBOT': 'Zephyr',
     'GEN_Z': 'Puck',
-    'POET': 'Algieba',        // User requested: Algieba
-    'TELENOVELA': 'Orus'      // User requested: Orus
+    'POET': 'Algieba',
+    'TELENOVELA': 'Orus'
   };
   return map[style] || 'Puck';
 };
@@ -231,8 +228,8 @@ export const generateMoreWords = async (catName: string, existing: string[]): Pr
 // Helper: Generate a text hint when image generation fails
 const generateTextHint = async (word: string): Promise<{type: 'text', content: string}> => {
     try {
-        const ai = getAIClient();
-        if (!ai) return { type: 'text', content: `No pude dibujar "${word}" (Falta API Key).` };
+        const ai = getAIClient(); 
+        if (!ai) return { type: 'text', content: `No pude dibujar "${word}" (Error de conexión). Intenta adivinar.` };
         
         const response = await ai.models.generateContent({
             model: "gemini-3-flash-preview",
@@ -246,28 +243,23 @@ const generateTextHint = async (word: string): Promise<{type: 'text', content: s
 };
 
 export const generateSketch = async (word: string): Promise<{type: 'image' | 'text', content: string} | null> => {
-  // Removed global blocking flag to allow retries on button click
-  
-  const hasImageKey = !!IMAGE_API_KEY && IMAGE_API_KEY.length > 0;
-  const hasMainKey = API_KEYS.length > 0;
-  
-  if (!hasImageKey && !hasMainKey) return { type: 'text', content: 'Falta configurar VITE_API_KEY o VITE_IMAGE_API_KEY en Vercel.' };
+  // --- STRATEGY: Quadruple Fallback ---
+  // 1. Dedicated Key + Gemini 2.5
+  // 2. Main Key + Gemini 2.5
+  // 3. Dedicated Key + Imagen 3 (New fallback model)
+  // 4. Main Key + Imagen 3
+  // 5. Text Hint
 
-  try {
-    // Force get the appropriate client
-    const ai = getImageAIClient();
-    if (!ai) throw new Error("MISSING_API_KEY");
+  const prompt = `Draw a simple, minimalist, black and white line art sketch representing the concept: "${word}". Style: Pictionary drawing on white background. High contrast. No text.`;
 
-    console.log(`🎨 Generando imagen para "${word}" con gemini-2.5-flash-image...`);
-    
-    const response = await ai.models.generateContent({
+  // Method 1: Gemini 2.5 Flash Image (Content Generation)
+  const tryGemini25 = async (client: GoogleGenAI, debugLabel: string) => {
+      console.log(`🎨 [${debugLabel}] Trying Gemini 2.5 Flash Image for "${word}"...`);
+      const response = await client.models.generateContent({
         model: "gemini-2.5-flash-image", 
-        contents: {
-            parts: [{ text: `Create a simple, minimalist, black and white line art drawing of a ${word} on a pure white background. It should look like a Pictionary sketch. High contrast. No text.` }]
-        },
+        contents: { parts: [{ text: prompt }] },
         config: {
             imageConfig: { aspectRatio: "1:1" },
-            // Permissive safety settings to avoid false positives blocking the drawing
             safetySettings: [
                 { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
                 { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
@@ -276,19 +268,80 @@ export const generateSketch = async (word: string): Promise<{type: 'image' | 'te
             ]
         }
     });
-
+    // Extract Image
     for (const part of response.candidates?.[0]?.content?.parts || []) {
-        if (part.inlineData) {
-            const mime = part.inlineData.mimeType || 'image/png';
-            return { type: 'image', content: `data:${mime};base64,${part.inlineData.data}` };
-        }
+      if (part.inlineData) {
+          const mime = part.inlineData.mimeType || 'image/png';
+          return { type: 'image' as const, content: `data:${mime};base64,${part.inlineData.data}` };
+      }
     }
-    throw new Error("La respuesta de IA no contenía datos de imagen.");
-    
+    throw new Error("No image data in Gemini 2.5 response");
+  };
+
+  // Method 2: Imagen 3 (Image Generation)
+  const tryImagen3 = async (client: GoogleGenAI, debugLabel: string) => {
+    console.log(`🎨 [${debugLabel}] Trying Imagen 3.0 for "${word}"...`);
+    const response = await client.models.generateImages({
+        model: 'imagen-3.0-generate-001',
+        prompt: prompt,
+        config: {
+            numberOfImages: 1,
+            aspectRatio: '1:1',
+            outputMimeType: 'image/jpeg'
+        }
+    });
+    const base64 = response.generatedImages?.[0]?.image?.imageBytes;
+    if (base64) {
+        return { type: 'image' as const, content: `data:image/jpeg;base64,${base64}` };
+    }
+    throw new Error("No image data in Imagen 3.0 response");
+  };
+
+  try {
+      let result;
+      
+      // 1. Dedicated Key + Gemini 2.5
+      if (IMAGE_API_KEY.length > 5) {
+          try {
+             const ai = new GoogleGenAI({ apiKey: IMAGE_API_KEY });
+             result = await tryGemini25(ai, "DEDICATED_KEY");
+             return result;
+          } catch (e: any) { console.warn(`⚠️ Dedicated/Gemini2.5 failed: ${e.message}`); }
+      }
+
+      // 2. Main Key + Gemini 2.5
+      if (API_KEYS.length > 0) {
+          try {
+            await withRotationRetry(async (ai) => {
+                result = await tryGemini25(ai, "MAIN_KEY_POOL");
+            });
+            if (result) return result;
+          } catch(e: any) { console.warn(`⚠️ Main/Gemini2.5 failed: ${e.message}`); }
+      }
+
+      // 3. Dedicated Key + Imagen 3 (Fallback)
+      if (IMAGE_API_KEY.length > 5) {
+        try {
+           const ai = new GoogleGenAI({ apiKey: IMAGE_API_KEY });
+           result = await tryImagen3(ai, "DEDICATED_KEY_IMAGEN");
+           return result;
+        } catch (e: any) { console.warn(`⚠️ Dedicated/Imagen3 failed: ${e.message}`); }
+      }
+
+      // 4. Main Key + Imagen 3 (Fallback)
+      if (API_KEYS.length > 0) {
+        try {
+            await withRotationRetry(async (ai) => {
+                result = await tryImagen3(ai, "MAIN_KEY_POOL_IMAGEN");
+            });
+            if (result) return result;
+        } catch(e: any) { console.error(`❌ Main/Imagen3 failed: ${e.message}`); }
+      }
+
+      throw new Error("All image generation attempts failed.");
+
   } catch (error: any) {
-     console.error("❌ Error generando imagen (Se usará pista de texto):", error);
-     
-     // Only fallback to text hint if image generation strictly fails
+     console.error("❌ Fatal Image Generation Error. Falling back to text hint.", error);
      return generateTextHint(word);
   }
 };

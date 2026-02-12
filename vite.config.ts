@@ -10,8 +10,8 @@ export default defineConfig(({ mode }) => {
   // Prioritize VITE_API_KEY if available (Vercel standard), fallback to API_KEY
   const apiKey = env.VITE_API_KEY || env.API_KEY || '';
   
-  // Specific key for Image Generation (optional, falls back to apiKey if not present)
-  const imageApiKey = env.VITE_IMAGE_API_KEY || '';
+  // Specific key for Image Generation. Check VITE_ prefix first, then standard name.
+  const imageApiKey = env.VITE_IMAGE_API_KEY || env.IMAGE_API_KEY || '';
 
   return {
     plugins: [react()],
