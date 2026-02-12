@@ -60,6 +60,9 @@ function App() {
     return DEFAULT_CATEGORIES;
   });
 
+  // Track used words to prevent repetition
+  const [usedWords, setUsedWords] = useState<Record<string, string[]>>({});
+
   const [drawerId, setDrawerId] = useState<string | null>(null);
   const [turnData, setTurnData] = useState<TurnData | null>(null);
   
@@ -136,8 +139,29 @@ function App() {
   const onSpinEnd = (category: Category) => {
     setIsSpinning(false);
     
-    // Pick random word
-    const randomWord = category.words[Math.floor(Math.random() * category.words.length)];
+    // --- NO-REPEAT LOGIC ---
+    // 1. Get words already used for this category
+    const previouslyUsed = usedWords[category.id] || [];
+    
+    // 2. Filter available words
+    let candidates = category.words.filter(w => !previouslyUsed.includes(w));
+    let isDeckReset = false;
+
+    // 3. If all words used, reset deck (use all words again)
+    if (candidates.length === 0) {
+        candidates = category.words;
+        isDeckReset = true;
+    }
+
+    // 4. Pick random
+    const randomWord = candidates[Math.floor(Math.random() * candidates.length)];
+    
+    // 5. Update used words state
+    setUsedWords(prev => ({
+        ...prev,
+        [category.id]: isDeckReset ? [randomWord] : [...(prev[category.id] || []), randomWord]
+    }));
+    // -----------------------
     
     if (!drawerId) return;
 
@@ -237,6 +261,7 @@ function App() {
     setParticipants(participants.map(p => ({ ...p, score: 0 })));
     setWinCommentary(null);
     setNotification(null);
+    setUsedWords({}); // Optional: Reset used words deck on new game
   };
 
   // Render Setup
