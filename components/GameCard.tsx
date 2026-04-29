@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { NarratorStyle, TurnData } from '../types';
-import { playTick, playTone, playAlert } from '../utils/audio';
+import { playTick, playTone, playAlert, playStart } from '../utils/audio';
 import { generateSketch, speakText } from '../services/geminiService';
 import { Timer, Wand2, XCircle, Play, Lightbulb } from 'lucide-react';
 
@@ -14,12 +14,32 @@ const GameCard: React.FC<GameCardProps> = ({ turnData, narratorStyle, onClose })
   const [timeLeft, setTimeLeft] = useState<number>(turnData.duration);
   const [generatedContent, setGeneratedContent] = useState<{type: 'image' | 'text', content: string} | null>(null);
   const [loadingImage, setLoadingImage] = useState(false);
-  const [isActive, setIsActive] = useState(false); // Manual start
+  const [isActive, setIsActive] = useState(false);
+  const [categoryAnnounced, setCategoryAnnounced] = useState(false);
   
-  // Announce category on mount
+  const prefetchPromiseRef = useRef<Promise<any> | null>(null);
+
+  // Announce category when 33 seconds remain
   useEffect(() => {
-    speakText(`La categoría es: ${turnData.category.name}`, narratorStyle);
-  }, [turnData.category.name, narratorStyle]);
+    if (isActive && timeLeft === 33 && !categoryAnnounced) {
+      setCategoryAnnounced(true);
+      speakText(`La categoría es: ${turnData.category.name}`, narratorStyle);
+    }
+  }, [isActive, timeLeft, categoryAnnounced, turnData.category.name, narratorStyle]);
+
+  // Reset categoryAnnounced when turn changes
+  useEffect(() => {
+    setCategoryAnnounced(false);
+  }, [turnData.word]);
+
+  // Preheat/Prefetch hint from AI
+  useEffect(() => {
+      // Background generate, but don't show it yet
+      prefetchPromiseRef.current = generateSketch(turnData.word).catch(e => {
+          console.error("Prefetch error:", e);
+          return null;
+      });
+  }, [turnData.word]);
 
   // Timer logic
   useEffect(() => {
@@ -57,7 +77,13 @@ const GameCard: React.FC<GameCardProps> = ({ turnData, narratorStyle, onClose })
     if (loadingImage) return;
     setLoadingImage(true);
     try {
-      const result = await generateSketch(turnData.word);
+      let result;
+      if (prefetchPromiseRef.current) {
+          result = await prefetchPromiseRef.current;
+      } else {
+          result = await generateSketch(turnData.word);
+      }
+
       if (result) {
         setGeneratedContent(result);
       } else {
@@ -92,14 +118,17 @@ const GameCard: React.FC<GameCardProps> = ({ turnData, narratorStyle, onClose })
           
           {/* Timer & Controls */}
           <div className="flex flex-col items-center justify-center shrink-0">
-             {!isActive && !isFinished && timeLeft === turnData.duration && (
-               <button 
-                 onClick={() => setIsActive(true)}
-                 className="mb-2 px-8 py-3 bg-green-500 hover:bg-green-600 text-white rounded-full font-bold text-lg shadow-lg flex items-center gap-2 animate-bounce"
-               >
-                 <Play fill="currentColor" size={20} /> Comenzar Tiempo
-               </button>
-             )}
+              {!isActive && !isFinished && timeLeft === turnData.duration && (
+                <button 
+                  onClick={() => {
+                    playStart();
+                    setIsActive(true);
+                  }}
+                  className="mb-4 px-12 py-5 bg-green-500 hover:bg-green-600 text-white rounded-full font-black text-2xl md:text-3xl shadow-xl flex items-center justify-center gap-3 w-full max-w-sm md:w-auto mx-auto active:scale-95 transition-transform z-10 relative"
+                >
+                  <Play fill="currentColor" size={32} /> COMENZAR
+                </button>
+              )}
 
              <div className={`text-8xl md:text-9xl leading-none font-black font-mono tabular-nums transition-all duration-300 ${
                isUrgent && !isFinished ? 'text-red-600 scale-110' : 'text-slate-800'

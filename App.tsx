@@ -9,12 +9,18 @@ import { Settings, Users, User, Play, RotateCcw, Mic, Radio, Home } from 'lucide
 
 // Default Data
 const DEFAULT_CATEGORIES: Category[] = [
-  { id: '1', name: 'Acciones', color: '#EF476F', words: ['Saltar', 'Correr', 'Dormir', 'Llorar', 'Reír', 'Bailar', 'Nadar'] },
-  { id: '2', name: 'Objetos', color: '#118AB2', words: ['Silla', 'Portátil', 'Plátano', 'Espada', 'Taza', 'Coche'] },
-  { id: '3', name: 'Animales', color: '#FFD166', words: ['León', 'Elefante', 'Gato', 'Perro', 'Jirafa', 'Pingüino'] },
-  { id: '4', name: 'Difícil', color: '#06D6A0', words: ['Filosofía', 'Gravedad', 'Internet', 'Sueño', 'Viento', 'Alma'] },
-  { id: '5', name: 'Películas', color: '#9D4EDD', words: ['Titanic', 'Avatar', 'Shrek', 'Matrix', 'Coco'] },
-  { id: '6', name: 'Comida', color: '#FF9F1C', words: ['Pizza', 'Sushi', 'Taco', 'Hamburguesa', 'Paella'] },
+  { id: '1', name: 'Acciones', color: '#EF476F', words: ['Saltar', 'Correr', 'Dormir', 'Llorar', 'Reír', 'Bailar', 'Nadar', 'Escribir', 'Cocinar', 'Pintar', 'Cantar', 'Patinar', 'Tocar guitarra', 'Hacer magia', 'Jugar fútbol', 'Pescar', 'Hacer yoga', 'Escalnar', 'Bucear', 'Voltear páginas'] },
+  { id: '2', name: 'Objetos', color: '#118AB2', words: ['Silla', 'Portátil', 'Plátano', 'Espada', 'Taza', 'Coche', 'Lámpara', 'Reloj', 'Teléfono', 'Gafas', 'Sombrero', 'Zapato', 'Moises', 'Telescopio', 'Microscopio', 'Paraguas', 'Maletín', 'Bolsa', 'Botella', 'Espejo'] },
+  { id: '3', name: 'Animales', color: '#FFD166', words: ['León', 'Elefante', 'Gato', 'Perro', 'Jirafa', 'Pingüino', 'Mariposa', 'Delfín', 'Tiburón', 'Araña', 'Serpiente', 'Caballo', 'Vaca', 'Cerdo', 'Oveja', 'Águila', 'Búho', 'Pingüino', 'Murciélago', 'Cangrejo'] },
+  { id: '4', name: 'Difícil', color: '#06D6A0', words: ['Filosofía', 'Gravedad', 'Internet', 'Sueño', 'Viento', 'Alma', 'Libertad', 'Eternidad', 'Misterio', 'Imaginación', 'Esperanza', 'Destino', 'Infinito', 'Equilibrio', 'Armonía', 'Caos', 'Reflejo', 'Sombra', 'Estrella', 'Universo'] },
+  { id: '5', name: 'Películas', color: '#9D4EDD', words: ['Titanic', 'Avatar', 'Shrek', 'Matrix', 'Coco', 'Toy Story', 'Buscando a Nemo', 'Frozen', 'Spider-Man', 'Batman', 'Star Wars', 'Harry Potter', 'Jurassic Park', 'Toy Story', 'Piratas del Caribe', 'Los Increíbles', 'Moana', 'Encanto', 'Soul', 'Coco'] },
+  { id: '6', name: 'Comida', color: '#FF9F1C', words: ['Pizza', 'Sushi', 'Taco', 'Hamburguesa', 'Paella', 'Lasaña', 'Tortilla', 'Arepa', 'Empanada', 'Ceviche', 'Pupusa', 'Tamales', 'Gallo pinto', 'Baleada', 'Mondongo', 'Enchiladas', 'Pozole', 'Mole', 'Aguacate', 'Plátano frito'] },
+  { id: '7', name: 'Deportes', color: '#E63946', words: ['Fútbol', 'Básquet', 'Tenis', 'Béisbol', 'Natación', 'Atletismo', 'Boxeo', 'Golf', 'Voleibol', 'Ciclismo', 'Esquí', 'Surfeo', 'Escalada', 'Artes marciales', 'Yoga', 'Pilates', 'Halterofilia', 'MMA', 'Carrera', 'Maratón'] },
+  { id: '8', name: 'Instrumentos', color: '#457B9D', words: ['Guitarra', 'Piano', 'Violín', 'Batería', 'Flauta', 'Saxofón', 'Trompeta', 'Clarinete', 'Ukulele', 'Tambor', 'Corno', 'Arpa', 'Contrabajo', 'Mandolina', 'Armónica', 'DJ', 'Micrófono', 'Teclado', 'Bongos', 'Maracas'] },
+  { id: '9', name: 'Lugares', color: '#2A9D8F', words: ['Playa', 'Montaña', 'Bosque', 'Desierto', 'Cueva', 'Volcán', 'Isla', 'Ciudad', 'Castillo', 'Templo', 'Museo', 'Estadio', 'Aeropuerto', 'Estación', 'Hospital', 'Escuela', 'Universidad', 'Zoológico', 'Parque', 'Centro comercial'] },
+  { id: '10', name: 'Profesiones', color: '#E9C46A', words: ['Doctor', 'Abogado', 'Maestro', 'Ingeniero', 'Chef', 'Piloto', 'Bombero', 'Policía', 'Soldado', 'Artista', 'Escritor', 'Músico', 'Actor', 'Dentista', 'Enfermero', 'Arquitecto', 'Banquero', 'Agricultor', 'Mecánico', 'Carpintero'] },
+  { id: '11', name: 'Vehículos', color: '#F77F00', words: ['Automóvil', 'Motocicleta', 'Avión', 'Barco', 'Tren', 'Autobús', 'Camión', 'Helicóptero', 'Submarino', 'Bicicleta', 'Scooter', 'Furgoneta', 'Jeep', 'Limusina', 'Carrusel', 'Triciclo', 'Lancha', 'Canoa', 'Yate', 'Cohete'] },
+  { id: '12', name: 'Naturaleza', color: '#386641', words: ['Sol', 'Luna', 'Mar', 'Río', 'Lago', 'Lluvia', 'Nieve', 'Rayos', 'Arcoíris', 'Tormenta', 'Huracán', 'Terremoto', 'Volcán', 'Cascada', 'Valle', 'Cañón', 'Cueva', 'Manantial', 'Bosque', 'Pradera'] },
 ];
 
 // Helper to get local storage
@@ -61,8 +67,23 @@ function App() {
     return DEFAULT_CATEGORIES;
   });
 
-  // Track used words to prevent repetition
-  const [usedWords, setUsedWords] = useState<Record<string, string[]>>({});
+  // Track used words to prevent repetition across games
+  const [usedWords, setUsedWords] = useState<Record<string, string[]>>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('pictio_used_words');
+      return saved ? JSON.parse(saved) : {};
+    }
+    return {};
+  });
+
+  // Track used categories to avoid category repetition
+  const [usedCategories, setUsedCategories] = useState<string[]>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('pictio_used_categories');
+      return saved ? JSON.parse(saved) : [];
+    }
+    return [];
+  });
 
   const [drawerId, setDrawerId] = useState<string | null>(null);
   const [turnData, setTurnData] = useState<TurnData | null>(null);
@@ -96,6 +117,14 @@ function App() {
   useEffect(() => {
     localStorage.setItem('pictio_categories_v1', JSON.stringify(categories));
   }, [categories]);
+
+  useEffect(() => {
+    localStorage.setItem('pictio_used_words', JSON.stringify(usedWords));
+  }, [usedWords]);
+
+  useEffect(() => {
+    localStorage.setItem('pictio_used_categories', JSON.stringify(usedCategories));
+  }, [usedCategories]);
 
   // Trigger TTS when notification changes
   useEffect(() => {
@@ -145,27 +174,36 @@ function App() {
   const onSpinEnd = (category: Category) => {
     setIsSpinning(false);
     
-    // --- NO-REPEAT LOGIC ---
-    // 1. Get words already used for this category
+    // --- NO-REPEAT LOGIC (Enhanced for fun) ---
+    // 1. Update Used Categories - avoid repeating same category too soon
+    setUsedCategories(prev => {
+        const updated = [...prev, category.id];
+        if (updated.length >= categories.length) {
+            return [];
+        }
+        return updated;
+    });
+
+    // 2. Get words already used for this category (recent history)
     const previouslyUsed = usedWords[category.id] || [];
     
-    // 2. Filter available words
+    // 3. Filter available words - exclude recently used
     let candidates = category.words.filter(w => !previouslyUsed.includes(w));
-    let isDeckReset = false;
-
-    // 3. If all words used, reset deck (use all words again)
+    
+    // 4. If all words used in this session for this category, reset but avoid last used
     if (candidates.length === 0) {
-        candidates = category.words;
-        isDeckReset = true;
+        candidates = category.words.filter(w => w !== previouslyUsed[previouslyUsed.length - 1]);
+        // Still shuffle to avoid predictable pattern
     }
 
-    // 4. Pick random
-    const randomWord = candidates[Math.floor(Math.random() * candidates.length)];
+    // 5. Smart random - pick from shuffled candidates
+    const shuffledCandidates = candidates.sort(() => Math.random() - 0.5);
+    const randomWord = shuffledCandidates[0];
     
-    // 5. Update used words state
+    // 6. Update used words state (keep last 10 per category for variety)
     setUsedWords(prev => ({
         ...prev,
-        [category.id]: isDeckReset ? [randomWord] : [...(prev[category.id] || []), randomWord]
+        [category.id]: [...(prev[category.id] || []), randomWord].slice(-10)
     }));
     // -----------------------
     
@@ -259,15 +297,14 @@ function App() {
   };
 
   const resetGame = () => {
-    gameSessionRef.current = Date.now(); // Invalidate any pending async commentaries from previous game
-    winLockRef.current = false; // Release the win lock for the new game
-
-    setPhase('SETUP');
-    // Reset scores but keep players for better UX with persistence
+    gameSessionRef.current = Date.now();
+    winLockRef.current = false;
+    stopAudio();
     setParticipants(participants.map(p => ({ ...p, score: 0 })));
+    setPhase('SPIN');
     setWinCommentary(null);
     setNotification(null);
-    setUsedWords({}); // Optional: Reset used words deck on new game
+    setTurnData(null);
   };
 
   // Render Setup
@@ -460,10 +497,10 @@ function App() {
       )}
 
       {/* Left Column: Wheel Area */}
-      <div className="flex-[2] flex flex-col items-center justify-center relative bg-white/40 rounded-3xl border border-slate-100 shadow-sm p-4">
+      <div className="flex-1 flex flex-col items-center justify-center relative bg-white/40 rounded-3xl border border-slate-100 shadow-sm p-4 min-w-0">
         
-        {/* Active Narrator Badge - Adjusted spacing to not overlap Home button in desktop view if needed, but Home is now outside */}
-        <div className="absolute top-4 left-4 md:left-28 z-30">
+        {/* Active Narrator Badge - Right side to avoid overlap with buttons */}
+        <div className="absolute top-4 right-16 md:right-20 z-30">
            <div className="flex items-center gap-2 bg-white/80 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-sm border border-slate-200 text-xs font-bold text-slate-500">
               <Radio className="w-3 h-3 text-red-500 animate-pulse" />
               <span>{NARRATOR_LABELS[narratorStyle]}</span>
@@ -474,32 +511,33 @@ function App() {
         <div className="absolute top-4 right-4 z-30">
            <button 
             onClick={() => setShowSettings(true)}
-            className="p-3 bg-white hover:bg-slate-50 rounded-full transition-colors shadow-sm border border-slate-200 text-slate-600"
+            className="p-2 md:p-3 bg-white hover:bg-slate-50 rounded-full transition-colors shadow-sm border border-slate-200 text-slate-600"
             title="Gestionar Categorías"
            >
-             <Settings className="w-6 h-6" />
+             <Settings className="w-5 h-5 md:w-6 md:h-6" />
            </button>
         </div>
 
-        {/* Wheel Container */}
-        <div className="w-full h-full flex items-center justify-center">
+        {/* Wheel Container - Fixed size */}
+        <div className="flex-1 flex items-center justify-center w-full">
            <Wheel 
              categories={categories} 
              isSpinning={isSpinning} 
              onSpinEnd={onSpinEnd}
              onSpinClick={handleSpin}
+             usedCategories={usedCategories}
            />
         </div>
         
         {!isSpinning && (
-          <p className="absolute bottom-8 text-slate-400 text-sm font-medium animate-pulse">
+          <p className="absolute bottom-4 md:bottom-8 text-slate-400 text-xs md:text-sm font-medium animate-pulse">
             Toca la ruleta para girar
           </p>
         )}
       </div>
 
-      {/* Right Column: Scoreboard */}
-      <div className="w-full md:w-80 lg:w-96 flex-shrink-0 h-full">
+      {/* Right Column: Scoreboard - Fixed width */}
+      <div className="w-72 lg:w-80 flex-shrink-0 h-full overflow-hidden">
         <Scoreboard 
           participants={participants} 
           drawerId={drawerId} 
@@ -508,14 +546,22 @@ function App() {
         />
       </div>
 
-      {/* Home / Exit Button - MOVED HERE (GLOBAL CONTEXT) TO ENSURE CLICKABILITY */}
-      <div className="absolute top-4 left-4 z-[60] cursor-pointer">
+      {/* Home / Reset Buttons - Bottom left area */}
+      <div className="absolute bottom-4 left-4 z-[60] flex gap-2">
+        <button 
+          onClick={resetGame}
+          className="p-2 md:p-3 bg-white hover:bg-orange-50 text-slate-600 hover:text-orange-500 rounded-full shadow-md border border-slate-200 transition-all active:scale-95 flex items-center gap-2 font-bold group"
+          title="Reiniciar Juego"
+        >
+          <RotateCcw className="w-5 h-5 md:w-6 md:h-6" />
+          <span className="hidden md:block max-w-0 overflow-hidden group-hover:max-w-xs transition-all duration-300 ease-in-out whitespace-nowrap text-sm">Reiniciar</span>
+        </button>
         <button 
           onClick={goToSetup}
-          className="p-3 bg-white hover:bg-red-50 text-slate-600 hover:text-red-500 rounded-full shadow-md border border-slate-200 transition-all active:scale-95 flex items-center gap-2 font-bold group"
+          className="p-2 md:p-3 bg-white hover:bg-red-50 text-slate-600 hover:text-red-500 rounded-full shadow-md border border-slate-200 transition-all active:scale-95 flex items-center gap-2 font-bold group"
           title="Volver a Configuración"
         >
-          <Home className="w-6 h-6" />
+          <Home className="w-5 h-5 md:w-6 md:h-6" />
           <span className="hidden md:block max-w-0 overflow-hidden group-hover:max-w-xs transition-all duration-300 ease-in-out whitespace-nowrap text-sm">Menú</span>
         </button>
       </div>

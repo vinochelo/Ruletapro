@@ -1,16 +1,17 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Category } from '../types';
 import * as d3 from 'd3';
-import { playWheelClick } from '../utils/audio';
+import { playWheelClick, playTone } from '../utils/audio';
 
 interface WheelProps {
   categories: Category[];
   onSpinEnd: (category: Category) => void;
   isSpinning: boolean;
   onSpinClick: () => void;
+  usedCategories?: string[];
 }
 
-const Wheel: React.FC<WheelProps> = ({ categories, onSpinEnd, isSpinning, onSpinClick }) => {
+const Wheel: React.FC<WheelProps> = ({ categories, onSpinEnd, isSpinning, onSpinClick, usedCategories }) => {
   const ref = useRef<SVGSVGElement>(null);
   const [rotation, setRotation] = useState(0);
 
@@ -28,9 +29,12 @@ const Wheel: React.FC<WheelProps> = ({ categories, onSpinEnd, isSpinning, onSpin
     if (isSpinning) {
       interval = window.setInterval(() => {
         playWheelClick();
-      }, 150);
+      }, 120);
     }
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      playTone(500, 'sine', 0.15, 0.4);
+    };
   }, [isSpinning]);
 
   useEffect(() => {
@@ -118,45 +122,68 @@ const Wheel: React.FC<WheelProps> = ({ categories, onSpinEnd, isSpinning, onSpin
 
   useEffect(() => {
     if (isSpinning) {
-      const newRotation = rotation + 1800 + Math.random() * 360; 
+      // Find available categories
+      const availableIndices: number[] = [];
+      categories.forEach((c, i) => {
+          if (!usedCategories?.includes(c.id)) {
+              availableIndices.push(i);
+          }
+      });
+      
+      const candidates = availableIndices.length > 0 ? availableIndices : categories.map((_, i) => i);
+      const targetIndex = candidates[Math.floor(Math.random() * candidates.length)];
+      
+      const segmentSize = 360 / categories.length;
+      // Add randomness within the segment (10% to 90% of the segment)
+      const offset = (Math.random() * 0.8 + 0.1) * segmentSize; 
+      const targetArrowAngle = (targetIndex * segmentSize + offset) % 360;
+      
+      // Calculate how much more rotation is needed to land on target
+      const requiredMod = (360 - targetArrowAngle) % 360;
+      
+      // Base rotation: at least 5 complete spins (1800 degrees)
+      const baseRotation = rotation + 1800;
+      const currentMod = baseRotation % 360;
+      
+      let extraDeg = requiredMod - currentMod;
+      if (extraDeg < 0) extraDeg += 360;
+      
+      const newRotation = baseRotation + extraDeg;
       setRotation(newRotation);
       
       setTimeout(() => {
-        const normalizedRotation = newRotation % 360;
-        const arrowAngle = (360 - normalizedRotation) % 360;
-        const segmentSize = 360 / categories.length;
-        const winningIndex = Math.floor(arrowAngle / segmentSize);
-        const actualIndex = winningIndex >= categories.length ? 0 : winningIndex;
-        
-        onSpinEnd(categories[actualIndex]);
+        onSpinEnd(categories[targetIndex]);
       }, 4000);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isSpinning]);
 
   return (
-    <div className="relative flex justify-center items-center py-12 w-full overflow-visible">
-      {/* Static Arrow Indicator */}
-      <div className="absolute -top-6 left-1/2 -translate-x-1/2 z-20 filter drop-shadow-lg">
-        <div className="w-16 h-20 bg-slate-800" style={{ clipPath: 'polygon(0% 0%, 100% 0%, 50% 100%)' }}></div>
+    <div className="relative flex justify-center items-center w-full h-full -mt-8">
+      {/* Static Arrow Indicator - Right on the edge of wheel */}
+      <div className="absolute -top-1 left-1/2 -translate-x-1/2 z-20">
+        <svg width="36" height="44" viewBox="0 0 36 44" fill="none" className="drop-shadow-lg">
+          <path d="M18 44L3 12C3 5 10.4 0 18 4C25.6 0 33 5 33 12L18 44Z" fill="#1e293b"/>
+          <path d="M18 38L7 14C7 8 11.6 3 18 7C24.4 3 29 8 29 14L18 38Z" fill="#334155"/>
+        </svg>
       </div>
 
       <div 
-        className={`relative rounded-full transition-all duration-300 ${isSpinning ? '' : 'cursor-pointer hover:scale-[1.01] active:scale-95'}`}
+        className={`relative rounded-full transition-all duration-300 cursor-pointer hover:scale-[1.01] active:scale-95`}
         onClick={onSpinClick}
         title="¡Toca para girar!"
       >
         <svg 
           ref={ref} 
           viewBox="0 0 600 600"
-          className="w-[90vw] h-[90vw] max-w-[600px] max-h-[600px]"
+          className="w-[550px] h-[550px] md:w-[680px] md:h-[680px]"
           style={{ 
             transition: 'transform 4s cubic-bezier(0.15, 0, 0.15, 1)', 
             transform: `rotate(${rotation}deg)` 
           }}
         />
-        {/* Center hub - Slightly larger to ensure coverage of inner join */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[24%] h-[24%] bg-white rounded-full shadow-lg border-8 border-slate-100 flex items-center justify-center z-10">
+        {/* Center hub */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[22%] h-[22%] bg-white rounded-full shadow-lg border-8 border-slate-100 flex items-center justify-center z-10">
             <div className="w-3/4 h-3/4 bg-slate-800 rounded-full flex items-center justify-center shadow-inner">
               {!isSpinning && <span className="text-white text-sm md:text-base font-black tracking-widest">GIRAR</span>}
             </div>

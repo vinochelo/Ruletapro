@@ -6,13 +6,25 @@ import { getLocalCommentary, PhraseType } from "../data/narratorPhrases";
 // Sanitize keys to remove accidental whitespace from copy-pasting
 const sanitizeKey = (k: string) => k ? k.trim().replace(/["']/g, "") : "";
 
-const RAW_KEYS = sanitizeKey(process.env.API_KEY || '');
+const getEnvVar = (name: string): string => {
+  try {
+    if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env[`VITE_${name}`]) {
+      return import.meta.env[`VITE_${name}`];
+    }
+    if (typeof process !== 'undefined' && process.env && process.env[name]) {
+      return process.env[name] as string;
+    }
+  } catch(e) {}
+  return '';
+};
+
+const RAW_KEYS = sanitizeKey(getEnvVar('API_KEY'));
 const API_KEYS = RAW_KEYS.includes(',') 
   ? RAW_KEYS.split(',').map(k => k.trim()).filter(k => k.length > 0)
   : [RAW_KEYS].filter(k => k.length > 0);
 
 // Dedicated Image Key (Optional) - Prioritize this for images
-const IMAGE_API_KEY = sanitizeKey(process.env.IMAGE_API_KEY || '');
+const IMAGE_API_KEY = sanitizeKey(getEnvVar('IMAGE_API_KEY'));
 
 // --- DEBUG LOGGING ---
 console.log(`🔧 API Config: ${API_KEYS.length} keys loaded. Image Key: ${IMAGE_API_KEY ? 'Present' : 'Not Set'}. Origin: ${typeof window !== 'undefined' ? window.location.origin : 'Server'}`);
@@ -162,7 +174,7 @@ export const generateNewCategories = async (existingCategories: string[]): Promi
     return await withRotationRetry(async (ai) => {
       const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
-        contents: `JSON: 3 categorias Pictionary únicas y divertidas (5 palabras c/u). Evitar: ${existingCategories.join(',')}.`,
+        contents: `JSON: 3 categorias Pictionary únicas y divertidas (entre 10 y 15 palabras cada una). Evitar: ${existingCategories.join(',')}.`,
         config: {
           responseMimeType: "application/json",
           responseSchema: {
@@ -193,7 +205,7 @@ export const generateCategoryFromTopic = async (topic: string): Promise<Category
     return await withRotationRetry(async (ai) => {
       const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
-        contents: `JSON: Lista 10 palabras Pictionary sobre: "${topic}".`,
+        contents: `JSON: Lista de 10 a 15 palabras Pictionary sobre: "${topic}".`,
         config: {
           responseMimeType: "application/json",
           responseSchema: {
